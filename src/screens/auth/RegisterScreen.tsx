@@ -1,33 +1,48 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AuthStackParamList } from '../../navigation/types';
-import { useAuth } from '../../contexts/AuthContext';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AuthStackParamList } from '../../navigation/types';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+type RegisterScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Register'>;
 
-const RegisterScreen: React.FC<Props> = ({ navigation }) => {
+export const RegisterScreen = () => {
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const { register, loading, error } = useAuth();
-
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const navigation = useNavigation<RegisterScreenNavigationProp>();
+  
   const handleRegister = async () => {
-    if (!email || !password || !displayName) {
-      Alert.alert('Error', 'Por favor completa todos los campos');
+    if (!displayName || !email || !password || !confirmPassword) {
+      setError('Por favor completa todos los campos');
       return;
     }
-
+    
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden');
+      setError('Las contraseñas no coinciden');
       return;
     }
-
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      await register(email, password, displayName);
+      // TODO: Implementar función de registro con Firebase
+      console.log('Registro con:', displayName, email, password);
+      // Simulación temporal de registro exitoso
+      setTimeout(() => {
+        setLoading(false);
+        // Redirigir al login después del registro exitoso
+        navigation.navigate('Login');
+      }, 1000);
     } catch (error) {
-      // El error ya se maneja en el contexto de autenticación
+      setError('Error al registrar usuario. Por favor intenta de nuevo.');
+      setLoading(false);
+      console.error(error);
     }
   };
 
@@ -60,10 +75,10 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <TextInput
             className="border border-gray-300 p-3 rounded-md"
             placeholder="Ingresa tu email"
-            keyboardType="email-address"
-            autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
         </View>
 
@@ -72,9 +87,9 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <TextInput
             className="border border-gray-300 p-3 rounded-md"
             placeholder="Ingresa tu contraseña"
-            secureTextEntry
             value={password}
             onChangeText={setPassword}
+            secureTextEntry
           />
         </View>
 
@@ -83,33 +98,31 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <TextInput
             className="border border-gray-300 p-3 rounded-md"
             placeholder="Confirma tu contraseña"
-            secureTextEntry
             value={confirmPassword}
             onChangeText={setConfirmPassword}
+            secureTextEntry
           />
         </View>
 
-        <TouchableOpacity
-          className="bg-blue-600 py-3 rounded-md"
+        <TouchableOpacity 
+          className={`p-3 rounded-md ${loading ? 'bg-blue-400' : 'bg-blue-600'}`}
           onPress={handleRegister}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text className="text-white text-center font-bold">Registrarse</Text>
-          )}
+          <Text className="text-white text-center font-bold">
+            {loading ? 'Registrando...' : 'Registrarse'}
+          </Text>
         </TouchableOpacity>
-
-        <View className="mt-6 flex-row justify-center">
-          <Text className="text-gray-600">¿Ya tienes una cuenta? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text className="text-blue-600 font-bold">Inicia Sesión</Text>
-          </TouchableOpacity>
-        </View>
+        
+        <TouchableOpacity 
+          className="mt-4"
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Text className="text-center text-blue-600">
+            ¿Ya tienes una cuenta? Inicia sesión
+          </Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
 };
-
-export default RegisterScreen;

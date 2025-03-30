@@ -2,23 +2,46 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
 
-import { useAuth } from '../contexts/AuthContext';
-import { RootStackParamList, AuthStackParamList, MainTabParamList, OrdersStackParamList } from './types';
+// Importación de tipos
+import { 
+  RootStackParamList, 
+  AuthStackParamList, 
+  MainTabParamList,
+  OrdersStackParamList
+} from './types';
 
-// Importaciones simplificadas usando los archivos de barril
+// Importación de pantallas de autenticación
 import { LoginScreen, RegisterScreen } from '../screens/auth';
-import { OrdersScreen, OrderDetailScreen, CreateOrderScreen, EditOrderScreen } from '../screens/orders';
-import { ProfileScreen } from '../screens/profile';
 
+// Pantallas temporales para el desarrollo (se reemplazarán más adelante)
+const TemporaryOrdersScreen = () => (
+  <View className="flex-1 items-center justify-center bg-white">
+    <Text className="text-xl">Pantalla de Pedidos</Text>
+  </View>
+);
+
+const TemporaryCreateOrderScreen = () => (
+  <View className="flex-1 items-center justify-center bg-white">
+    <Text className="text-xl">Crear Pedido</Text>
+  </View>
+);
+
+const TemporaryProfileScreen = () => (
+  <View className="flex-1 items-center justify-center bg-white">
+    <Text className="text-xl">Perfil de Usuario</Text>
+  </View>
+);
+
+// Creación de los navegadores
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const OrdersStack = createNativeStackNavigator<OrdersStackParamList>();
 
-// Navegación para autenticación
+// Navegador de autenticación
 const AuthNavigator = () => (
   <AuthStack.Navigator screenOptions={{ headerShown: false }}>
     <AuthStack.Screen name="Login" component={LoginScreen} />
@@ -26,33 +49,23 @@ const AuthNavigator = () => (
   </AuthStack.Navigator>
 );
 
-// Navegación para pedidos
+// Navegador de pedidos
 const OrdersNavigator = () => (
   <OrdersStack.Navigator>
     <OrdersStack.Screen 
       name="OrdersList" 
-      component={OrdersScreen} 
-      options={{ title: 'Pedidos' }}
-    />
-    <OrdersStack.Screen 
-      name="OrderDetail" 
-      component={OrderDetailScreen} 
-      options={{ title: 'Detalle de Pedido' }}
-    />
-    <OrdersStack.Screen 
-      name="EditOrder" 
-      component={EditOrderScreen} 
-      options={{ title: 'Editar Pedido' }}
+      component={TemporaryOrdersScreen} 
+      options={{ headerTitle: 'Mis Pedidos' }}
     />
   </OrdersStack.Navigator>
 );
 
-// Navegación principal con tabs
+// Navegador principal con pestañas
 const MainNavigator = () => (
-  <MainTab.Navigator 
+  <MainTab.Navigator
     screenOptions={({ route }) => ({
       tabBarIcon: ({ focused, color, size }) => {
-        let iconName: keyof typeof Ionicons.glyphMap = 'help-outline';
+        let iconName: any;
 
         if (route.name === 'Orders') {
           iconName = focused ? 'list' : 'list-outline';
@@ -64,7 +77,7 @@ const MainNavigator = () => (
 
         return <Ionicons name={iconName} size={size} color={color} />;
       },
-      tabBarActiveTintColor: '#3b82f6',
+      tabBarActiveTintColor: '#3b82f6', // Tailwind blue-500
       tabBarInactiveTintColor: 'gray',
     })}
   >
@@ -75,31 +88,26 @@ const MainNavigator = () => (
     />
     <MainTab.Screen 
       name="CreateOrder" 
-      component={CreateOrderScreen} 
+      component={TemporaryCreateOrderScreen} 
       options={{ title: 'Crear Pedido' }}
     />
     <MainTab.Screen 
       name="Profile" 
-      component={ProfileScreen} 
+      component={TemporaryProfileScreen} 
       options={{ title: 'Perfil' }}
     />
   </MainTab.Navigator>
 );
 
-// Navegador raíz que controla la autenticación
+// Navegador raíz
 export const AppNavigator = () => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    // Aquí podríamos mostrar una pantalla de carga
-    return null;
-  }
+  // Aquí eventualmente verificaremos el estado de autenticación
+  const isAuthenticated = false;
 
   return (
     <NavigationContainer>
-      <StatusBar style="auto" />
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
+        {isAuthenticated ? (
           <RootStack.Screen name="Main" component={MainNavigator} />
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />
