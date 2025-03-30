@@ -1,11 +1,13 @@
-import React from 'react';
+import "./global.css";
+import { StatusBar } from 'expo-status-bar';
 import { Text, View } from 'react-native';
 
 export default function App() {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontSize: 24 }}>¡Bienvenido a Panbol!</Text>
-      <Text style={{ marginTop: 8 }}>Aplicación de gestión de pedidos</Text>
+    <View className="flex-1 items-center justify-center bg-white">
+      <Text className="text-2xl font-bold text-blue-600">¡Bienvenido a Panbol!</Text>
+      <Text className="text-base text-gray-600 mt-2">Aplicación de gestión de pedidos</Text>
+      <StatusBar style="auto" />
     </View>
   );
 }
