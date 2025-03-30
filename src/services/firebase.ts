@@ -4,12 +4,13 @@ import { getFirestore } from 'firebase/firestore';
 
 // Configuración de Firebase
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBe9oC6UZCjavGYu524DQy8naiHGhR4wXY",
+  authDomain: "panbol-88342.firebaseapp.com",
+  projectId: "panbol-88342",
+  storageBucket: "panbol-88342.firebasestorage.app",
+  messagingSenderId: "748241497885",
+  appId: "1:748241497885:web:7fe3ca19ecf19903593bf4",
+  measurementId: "G-1KKCBD3RK5"
 };
 
 // Inicializar Firebase

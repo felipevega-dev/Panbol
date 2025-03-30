@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,13 +11,15 @@ import { Order } from '../../types';
 type Props = OrdersScreenProps<'OrdersList'>;
 
 const OrdersScreen: React.FC<Props> = ({ navigation }) => {
-  const { orders, loading, getOrders, exportOrdersToCSV } = useOrders();
+  const { orders, loading, getOrders, exportOrdersToCSV, canEditOrder } = useOrders();
 
   useEffect(() => {
     getOrders();
   }, []);
 
   const handleExportCSV = async () => {
+    if (loading) return;
+    
     try {
       const filePath = await exportOrdersToCSV();
       Alert.alert(
@@ -33,29 +35,29 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
+    switch (status.toUpperCase()) {
+      case 'ENTREGADO':
         return 'bg-green-500';
-      case 'canceled':
+      case 'CANCELADO':
         return 'bg-red-500';
-      case 'processing':
-        return 'bg-orange-500';
+      case 'PENDIENTE':
       default:
         return 'bg-blue-500';
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     try {
-      return format(new Date(dateString), 'dd MMM yyyy', { locale: es });
+      const date = dateString instanceof Date ? dateString : new Date(dateString);
+      return format(date, 'dd MMM yyyy', { locale: es });
     } catch (error) {
-      return dateString;
+      return String(dateString);
     }
   };
 
   const renderOrderItem = ({ item }: { item: Order }) => {
-    const totalProducts = item.products.reduce((sum, product) => sum + product.quantity, 0);
-    const statusColor = getStatusColor(item.status);
+    const statusColor = getStatusColor(item.estado);
+    const isEditable = canEditOrder(item);
     
     return (
       <TouchableOpacity
@@ -66,22 +68,38 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
           <View className="flex-row justify-between items-center">
             <View className="flex-1">
               <Text className="text-lg font-bold text-gray-800">Pedido #{item.id.substring(0, 8)}</Text>
-              <Text className="text-gray-600">Fecha: {formatDate(item.orderDate)}</Text>
-              <Text className="text-gray-600">Entrega: {formatDate(item.deliveryDate)}</Text>
+              <Text className="text-gray-600">Fecha: {formatDate(item.fechaPedido)}</Text>
+              <Text className="text-gray-600">Entrega: {formatDate(item.fechaEntrega)}</Text>
             </View>
             <View className={`px-2 py-1 rounded-full ${statusColor}`}>
-              <Text className="text-white font-medium">{item.status}</Text>
+              <Text className="text-white font-medium">{item.estado}</Text>
             </View>
           </View>
           
-          <View className="mt-2 flex-row items-center">
-            <Ionicons name="cube-outline" size={16} color="#6B7280" />
-            <Text className="ml-1 text-gray-600">{totalProducts} productos</Text>
-          </View>
+          {isEditable && (
+            <View className="mt-2">
+              <Text className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full self-start">
+                Editable hasta las 20:00
+              </Text>
+            </View>
+          )}
           
-          {item.observations && (
+          {item.esFeriado && (
+            <View className="mt-2 flex-row items-center">
+              <Ionicons name="calendar" size={16} color="#EF4444" />
+              <Text className="ml-1 text-red-500 font-medium">Día Feriado</Text>
+            </View>
+          )}
+          
+          {item.observaciones && (
             <View className="mt-2 p-2 bg-gray-100 rounded-md">
-              <Text className="text-gray-600 italic">{item.observations}</Text>
+              <Text className="text-gray-600 italic">{item.observaciones}</Text>
+            </View>
+          )}
+
+          {item.total !== undefined && (
+            <View className="mt-2 flex-row justify-end">
+              <Text className="font-bold text-gray-800">Total: ${item.total.toFixed(2)}</Text>
             </View>
           )}
         </View>
@@ -96,9 +114,16 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           className="flex-row items-center bg-blue-600 px-3 py-2 rounded-lg"
           onPress={handleExportCSV}
+          disabled={loading || orders.length === 0}
         >
-          <Ionicons name="download-outline" size={18} color="white" />
-          <Text className="ml-1 text-white font-medium">Exportar CSV</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Ionicons name="download-outline" size={18} color="white" />
+              <Text className="ml-1 text-white font-medium">Exportar CSV</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -114,9 +139,24 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
           <View className="py-8 items-center">
             <Ionicons name="document-outline" size={48} color="#9CA3AF" />
             <Text className="mt-2 text-gray-500 text-lg">No hay pedidos disponibles</Text>
+            {!loading && (
+              <TouchableOpacity 
+                className="mt-4 bg-blue-500 px-4 py-2 rounded-lg"
+                onPress={() => navigation.navigate('CreateOrder')}
+              >
+                <Text className="text-white font-medium">Crear Pedido</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
+
+      <TouchableOpacity
+        className="absolute bottom-6 right-6 bg-blue-600 w-14 h-14 rounded-full items-center justify-center shadow-lg"
+        onPress={() => navigation.navigate('CreateOrder')}
+      >
+        <Ionicons name="add" size={30} color="white" />
+      </TouchableOpacity>
     </View>
   );
 };

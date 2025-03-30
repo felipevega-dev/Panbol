@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,55 +8,44 @@ import {
   Image, 
   Alert,
   ActivityIndicator,
-  Platform
+  Platform,
+  Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 import { MainTabScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
-import { PREDEFINED_PRODUCTS } from '../../constants/products';
-import { Product } from '../../types';
+import { ProductWithQuantity } from '../../types';
 
 type Props = MainTabScreenProps<'CreateOrder'>;
 
 const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
-  const { createOrder, loading } = useOrders();
+  const { createNewOrder, availableProducts, loadAvailableProducts, selectProduct, resetSelectedProducts, loading } = useOrders();
   
-  // Estado para los productos seleccionados
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>(
-    PREDEFINED_PRODUCTS.map(product => ({...product, quantity: 0}))
-  );
+  // Cargar productos al montar el componente
+  useEffect(() => {
+    loadAvailableProducts();
+    // Resetear productos al desmontar el componente
+    return () => resetSelectedProducts();
+  }, []);
   
   // Estado para las fechas
-  const [orderDate, setOrderDate] = useState(new Date());
   const [deliveryDate, setDeliveryDate] = useState(new Date());
-  const [showOrderDatePicker, setShowOrderDatePicker] = useState(false);
   const [showDeliveryDatePicker, setShowDeliveryDatePicker] = useState(false);
   
-  // Estado para observaciones
+  // Estado para observaciones y día feriado
   const [observations, setObservations] = useState('');
+  const [isHoliday, setIsHoliday] = useState(false);
 
   // Cambiar cantidad de un producto
-  const changeQuantity = (id: string, amount: number) => {
-    setSelectedProducts(prevProducts => 
-      prevProducts.map(product => 
-        product.id === id 
-          ? { ...product, quantity: Math.max(0, product.quantity + amount) } 
-          : product
-      )
-    );
+  const handleQuantityChange = (productId: string, quantity: number) => {
+    selectProduct(productId, quantity);
   };
 
-  // Manejar cambios en los date pickers
-  const onOrderDateChange = (event: any, selectedDate?: Date) => {
-    setShowOrderDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setOrderDate(selectedDate);
-    }
-  };
-
+  // Manejar cambios en el date picker
   const onDeliveryDateChange = (event: any, selectedDate?: Date) => {
     setShowDeliveryDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
@@ -67,29 +56,26 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   // Validar y crear el pedido
   const handleCreateOrder = async () => {
     // Filtrar productos con cantidad > 0
-    const productsToOrder = selectedProducts.filter(product => product.quantity > 0);
+    const productsToOrder = availableProducts.filter(product => product.cantidad > 0);
     
     if (productsToOrder.length === 0) {
       Alert.alert('Error', 'Debes seleccionar al menos un producto');
       return;
     }
     
-    if (deliveryDate < orderDate) {
-      Alert.alert('Error', 'La fecha de entrega no puede ser anterior a la fecha del pedido');
-      return;
-    }
-    
     try {
-      const orderId = await createOrder({
-        products: productsToOrder,
-        orderDate: orderDate.toISOString(),
-        deliveryDate: deliveryDate.toISOString(),
-        observations
-      });
+      await createNewOrder(
+        {
+          fechaEntrega: deliveryDate,
+          observaciones: observations,
+          esFeriado: isHoliday
+        },
+        productsToOrder
+      );
       
       Alert.alert(
         'Pedido Creado',
-        `Tu pedido ha sido creado exitosamente con ID: ${orderId}`,
+        'Tu pedido ha sido creado exitosamente',
         [
           { 
             text: 'Ver Pedidos', 
@@ -99,10 +85,10 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
       );
       
       // Resetear el formulario
-      setSelectedProducts(PREDEFINED_PRODUCTS.map(product => ({...product, quantity: 0})));
+      resetSelectedProducts();
       setObservations('');
-      setOrderDate(new Date());
       setDeliveryDate(new Date());
+      setIsHoliday(false);
     } catch (error) {
       Alert.alert(
         'Error',
@@ -112,11 +98,11 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   // Calcular total del pedido
-  const totalAmount = selectedProducts
-    .reduce((sum, product) => sum + (product.price * product.quantity), 0);
+  const totalAmount = availableProducts
+    .reduce((sum, product) => sum + (product.precio * product.cantidad), 0);
     
-  const totalItems = selectedProducts
-    .reduce((sum, product) => sum + product.quantity, 0);
+  const totalItems = availableProducts
+    .reduce((sum, product) => sum + product.cantidad, 0);
 
   return (
     <ScrollView className="flex-1 bg-gray-100">
@@ -125,71 +111,60 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
         <Text className="text-gray-600">Selecciona productos y especifica cantidades</Text>
       </View>
 
-      <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-2">Productos Disponibles</Text>
+      {loading && (
+        <View className="p-10 items-center justify-center">
+          <ActivityIndicator size="large" color="#0284c7" />
+          <Text className="mt-2 text-gray-600">Cargando productos...</Text>
+        </View>
+      )}
 
-        {selectedProducts.map((product) => (
-          <View 
-            key={product.id} 
-            className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row items-center"
-          >
-            <Image 
-              source={{ uri: product.image }} 
-              className="w-20 h-20 rounded-md mr-3"
-              defaultSource={require('../../assets/product-placeholder.png')}
-            />
-            
-            <View className="flex-1">
-              <Text className="text-gray-800 font-bold">{product.name}</Text>
-              <Text className="text-gray-600">${product.price} c/u</Text>
+      {!loading && (
+        <View className="p-4">
+          <Text className="text-lg font-bold text-gray-800 mb-2">Productos Disponibles</Text>
+
+          {availableProducts.map((product) => (
+            <View 
+              key={product.id} 
+              className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row items-center"
+            >
+              <Image 
+                source={{ uri: product.imagen }} 
+                className="w-20 h-20 rounded-md mr-3"
+              />
               
-              <View className="flex-row items-center mt-2">
-                <TouchableOpacity
-                  className="bg-gray-200 w-8 h-8 rounded-full items-center justify-center"
-                  onPress={() => changeQuantity(product.id, -1)}
-                  disabled={product.quantity <= 0}
-                >
-                  <Ionicons name="remove" size={18} color="#374151" />
-                </TouchableOpacity>
+              <View className="flex-1">
+                <Text className="text-gray-800 font-bold">{product.producto}</Text>
+                <Text className="text-gray-500 text-sm">{product.categoria}</Text>
+                <Text className="text-gray-600">${product.precio} c/u</Text>
                 
-                <Text className="mx-4 text-lg font-bold text-gray-800 min-w-[30px] text-center">
-                  {product.quantity}
-                </Text>
-                
-                <TouchableOpacity
-                  className="bg-blue-500 w-8 h-8 rounded-full items-center justify-center"
-                  onPress={() => changeQuantity(product.id, 1)}
-                >
-                  <Ionicons name="add" size={18} color="white" />
-                </TouchableOpacity>
+                <View className="flex-row items-center mt-2">
+                  <TouchableOpacity
+                    className="bg-gray-200 w-8 h-8 rounded-full items-center justify-center"
+                    onPress={() => handleQuantityChange(product.id, Math.max(0, product.cantidad - 1))}
+                    disabled={product.cantidad <= 0}
+                  >
+                    <Ionicons name="remove" size={18} color="#374151" />
+                  </TouchableOpacity>
+                  
+                  <Text className="mx-4 text-lg font-bold text-gray-800 min-w-[30px] text-center">
+                    {product.cantidad}
+                  </Text>
+                  
+                  <TouchableOpacity
+                    className="bg-blue-500 w-8 h-8 rounded-full items-center justify-center"
+                    onPress={() => handleQuantityChange(product.id, product.cantidad + 1)}
+                  >
+                    <Ionicons name="add" size={18} color="white" />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
 
       <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-2">Fechas</Text>
-        
-        <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
-          <Text className="text-gray-600 mb-2">Fecha del Pedido</Text>
-          <TouchableOpacity
-            className="border border-gray-300 p-3 rounded-md flex-row justify-between items-center"
-            onPress={() => setShowOrderDatePicker(true)}
-          >
-            <Text>{format(orderDate, 'dd/MM/yyyy')}</Text>
-            <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          
-          {showOrderDatePicker && (
-            <DateTimePicker
-              value={orderDate}
-              mode="date"
-              display="default"
-              onChange={onOrderDateChange}
-            />
-          )}
-        </View>
+        <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>
         
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
           <Text className="text-gray-600 mb-2">Fecha de Entrega</Text>
@@ -197,7 +172,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
             className="border border-gray-300 p-3 rounded-md flex-row justify-between items-center"
             onPress={() => setShowDeliveryDatePicker(true)}
           >
-            <Text>{format(deliveryDate, 'dd/MM/yyyy')}</Text>
+            <Text>{format(deliveryDate, 'dd/MM/yyyy', { locale: es })}</Text>
             <Ionicons name="calendar-outline" size={20} color="#6B7280" />
           </TouchableOpacity>
           
@@ -207,46 +182,59 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
               mode="date"
               display="default"
               onChange={onDeliveryDateChange}
+              minimumDate={new Date()}
             />
           )}
         </View>
-      </View>
 
-      <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-2">Observaciones</Text>
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
+          <Text className="text-gray-600 mb-2">Observaciones</Text>
           <TextInput
-            className="border border-gray-300 p-3 rounded-md"
-            placeholder="Especifica cualquier detalle adicional sobre el pedido"
-            multiline
-            numberOfLines={4}
+            className="border border-gray-300 p-3 rounded-md min-h-[100px]"
             value={observations}
             onChangeText={setObservations}
+            placeholder="Escribe instrucciones especiales o detalles adicionales aquí..."
+            multiline
             textAlignVertical="top"
+          />
+        </View>
+
+        <View className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row justify-between items-center">
+          <Text className="text-gray-600">¿Es día feriado?</Text>
+          <Switch
+            value={isHoliday}
+            onValueChange={setIsHoliday}
+            trackColor={{ false: "#767577", true: "#0284c7" }}
+            thumbColor={isHoliday ? "#fff" : "#f4f3f4"}
           />
         </View>
       </View>
 
-      <View className="bg-white p-4 shadow-sm">
-        <View className="flex-row justify-between mb-4">
-          <Text className="text-gray-600">Total Productos:</Text>
-          <Text className="text-gray-800 font-bold">{totalItems}</Text>
+      <View className="p-4 bg-white rounded-lg shadow-sm mb-4">
+        <View className="flex-row justify-between mb-2">
+          <Text className="text-gray-600">Productos seleccionados:</Text>
+          <Text className="font-bold text-gray-800">{totalItems}</Text>
         </View>
         
         <View className="flex-row justify-between mb-4">
-          <Text className="text-gray-600">Total a Pagar:</Text>
-          <Text className="text-gray-800 font-bold">${totalAmount.toFixed(2)}</Text>
+          <Text className="text-gray-600">Total a pagar:</Text>
+          <Text className="font-bold text-gray-800">${totalAmount.toFixed(2)}</Text>
         </View>
         
         <TouchableOpacity
-          className="bg-blue-600 py-3 rounded-lg items-center"
+          className="bg-blue-500 p-4 rounded-lg items-center justify-center"
           onPress={handleCreateOrder}
-          disabled={loading}
+          disabled={loading || totalItems === 0}
         >
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className="text-white font-bold">Crear Pedido</Text>
+            <>
+              <Text className="text-white font-bold text-lg">Crear Pedido</Text>
+              <Text className="text-white text-sm mt-1">
+                {totalItems === 0 ? 'Selecciona al menos un producto' : `${totalItems} productos | $${totalAmount.toFixed(2)}`}
+              </Text>
+            </>
           )}
         </TouchableOpacity>
       </View>

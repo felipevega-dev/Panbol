@@ -1,40 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
-import { Order } from '../../types';
+import { OrderWithDetails } from '../../types';
 
 type Props = OrdersScreenProps<'OrderDetail'>;
 
 const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId } = route.params;
-  const { getOrderById, isEditable, deleteOrder } = useOrders();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { getOrderDetails, canEditOrder, removeOrder, selectedOrder, loading } = useOrders();
 
   useEffect(() => {
     loadOrderDetails();
   }, [orderId]);
 
   const loadOrderDetails = async () => {
-    setLoading(true);
     try {
-      const orderData = await getOrderById(orderId);
-      setOrder(orderData);
+      await getOrderDetails(orderId);
     } catch (error) {
       Alert.alert('Error', 'No se pudo cargar el detalle del pedido');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleEditOrder = () => {
-    if (order) {
-      navigation.navigate('EditOrder', { order });
+    if (selectedOrder) {
+      navigation.navigate('EditOrder', { order: selectedOrder });
     }
   };
 
@@ -49,7 +43,7 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteOrder(orderId);
+              await removeOrder(orderId);
               Alert.alert('Éxito', 'El pedido ha sido eliminado correctamente');
               navigation.goBack();
             } catch (error) {
@@ -64,22 +58,22 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     try {
-      return format(new Date(dateString), 'dd MMMM yyyy', { locale: es });
+      const date = dateString instanceof Date ? dateString : new Date(dateString);
+      return format(date, 'dd MMMM yyyy', { locale: es });
     } catch (error) {
-      return dateString;
+      return String(dateString);
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
+    switch (status.toUpperCase()) {
+      case 'ENTREGADO':
         return 'bg-green-500';
-      case 'canceled':
+      case 'CANCELADO':
         return 'bg-red-500';
-      case 'processing':
-        return 'bg-orange-500';
+      case 'PENDIENTE':
       default:
         return 'bg-blue-500';
     }
@@ -94,7 +88,7 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  if (!order) {
+  if (!selectedOrder) {
     return (
       <View className="flex-1 justify-center items-center bg-gray-100 p-4">
         <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
@@ -112,48 +106,74 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
-  const canEdit = isEditable(order);
-  const totalAmount = order.products.reduce((sum, product) => sum + (product.price * product.quantity), 0);
+  const order = selectedOrder;
+  const canEdit = canEditOrder(order);
+  const totalAmount = order.productos.reduce((sum, product) => sum + (product.precio * product.cantidad), 0);
 
   return (
     <ScrollView className="flex-1 bg-gray-100">
       <View className="bg-white p-4 mb-4 shadow-sm">
         <View className="flex-row justify-between items-center">
           <Text className="text-2xl font-bold text-gray-800">Pedido #{order.id.substring(0, 8)}</Text>
-          <View className={`px-3 py-1 rounded-full ${getStatusColor(order.status)}`}>
-            <Text className="text-white font-medium">{order.status}</Text>
+          <View className={`px-3 py-1 rounded-full ${getStatusColor(order.estado)}`}>
+            <Text className="text-white font-medium">{order.estado}</Text>
           </View>
         </View>
 
         <View className="mt-4 flex-row justify-between">
           <View>
             <Text className="text-gray-500">Fecha Pedido</Text>
-            <Text className="text-gray-800 font-medium">{formatDate(order.orderDate)}</Text>
+            <Text className="text-gray-800 font-medium">{formatDate(order.fechaPedido)}</Text>
           </View>
           <View>
             <Text className="text-gray-500">Fecha Entrega</Text>
-            <Text className="text-gray-800 font-medium">{formatDate(order.deliveryDate)}</Text>
+            <Text className="text-gray-800 font-medium">{formatDate(order.fechaEntrega)}</Text>
           </View>
         </View>
+        
+        {order.esFeriado && (
+          <View className="mt-4 bg-red-50 p-2 rounded-md flex-row items-center">
+            <Ionicons name="calendar" size={20} color="#EF4444" />
+            <Text className="ml-2 text-red-600 font-medium">Día Feriado</Text>
+          </View>
+        )}
+        
+        {canEdit && (
+          <View className="mt-4 bg-blue-50 p-2 rounded-md">
+            <Text className="text-blue-600">
+              <Ionicons name="information-circle-outline" size={16} /> Este pedido puede editarse hasta las 20:00 de hoy.
+            </Text>
+          </View>
+        )}
       </View>
 
       <View className="bg-white p-4 mb-4 shadow-sm">
         <Text className="text-xl font-bold text-gray-800 mb-4">Productos</Text>
-        {order.products.map((product, index) => (
+        {order.productos.map((product, index) => (
           <View 
             key={`${product.id}-${index}`}
             className="flex-row justify-between items-center py-3 border-b border-gray-200"
           >
             <View className="flex-row items-center">
-              <View className="w-10 h-10 bg-gray-200 rounded-md items-center justify-center mr-3">
-                <Ionicons name="cube-outline" size={24} color="#6B7280" />
-              </View>
+              {product.imagen ? (
+                <Image 
+                  source={{ uri: product.imagen }} 
+                  className="w-12 h-12 rounded-md mr-3"
+                />
+              ) : (
+                <View className="w-12 h-12 bg-gray-200 rounded-md items-center justify-center mr-3">
+                  <Ionicons name="cube-outline" size={24} color="#6B7280" />
+                </View>
+              )}
               <View>
-                <Text className="text-gray-800 font-medium">{product.name}</Text>
-                <Text className="text-gray-500">${product.price.toFixed(2)}</Text>
+                <Text className="text-gray-800 font-medium">{product.producto}</Text>
+                <Text className="text-gray-500">${product.precio.toFixed(2)}</Text>
               </View>
             </View>
-            <Text className="text-gray-800 font-medium">x{product.quantity}</Text>
+            <View className="items-end">
+              <Text className="text-gray-800 font-medium">x{product.cantidad}</Text>
+              <Text className="text-gray-600">${(product.precio * product.cantidad).toFixed(2)}</Text>
+            </View>
           </View>
         ))}
         
@@ -165,10 +185,10 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
       </View>
 
-      {order.observations && (
+      {order.observaciones && (
         <View className="bg-white p-4 mb-4 shadow-sm">
           <Text className="text-xl font-bold text-gray-800 mb-2">Observaciones</Text>
-          <Text className="text-gray-600">{order.observations}</Text>
+          <Text className="text-gray-600">{order.observaciones}</Text>
         </View>
       )}
 
