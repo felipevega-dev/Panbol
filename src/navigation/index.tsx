@@ -8,16 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { RootStackParamList, AuthStackParamList, MainTabParamList, OrdersStackParamList } from './types';
 
-// Auth Screens
-import LoginScreen from '../screens/auth/LoginScreen';
-import RegisterScreen from '../screens/auth/RegisterScreen';
-
-// Main Screens
-import OrdersScreen from '../screens/orders/OrdersScreen';
-import OrderDetailScreen from '../screens/orders/OrderDetailScreen';
-import CreateOrderScreen from '../screens/orders/CreateOrderScreen';
-import EditOrderScreen from '../screens/orders/EditOrderScreen';
-import ProfileScreen from '../screens/profile/ProfileScreen';
+// Importaciones simplificadas usando los archivos de barril
+import { LoginScreen, RegisterScreen } from '../screens/auth';
+import { OrdersScreen, OrderDetailScreen, CreateOrderScreen, EditOrderScreen } from '../screens/orders';
+import { ProfileScreen } from '../screens/profile';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
