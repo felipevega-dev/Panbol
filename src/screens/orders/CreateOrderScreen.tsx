@@ -12,13 +12,13 @@ import {
   Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { MainTabScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
 import { ProductWithQuantity } from '../../types';
+import CustomDatePicker from '../../components/CustomDatePicker';
 
 type Props = MainTabScreenProps<'CreateOrder'>;
 
@@ -34,7 +34,6 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   
   // Estado para las fechas
   const [deliveryDate, setDeliveryDate] = useState(new Date());
-  const [showDeliveryDatePicker, setShowDeliveryDatePicker] = useState(false);
   
   // Estado para observaciones y día feriado
   const [observations, setObservations] = useState('');
@@ -46,8 +45,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   // Manejar cambios en el date picker
-  const onDeliveryDateChange = (event: any, selectedDate?: Date) => {
-    setShowDeliveryDatePicker(Platform.OS === 'ios');
+  const onDeliveryDateChange = (selectedDate?: Date) => {
     if (selectedDate) {
       setDeliveryDate(selectedDate);
     }
@@ -168,23 +166,12 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
         
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
           <Text className="text-gray-600 mb-2">Fecha de Entrega</Text>
-          <TouchableOpacity
-            className="border border-gray-300 p-3 rounded-md flex-row justify-between items-center"
-            onPress={() => setShowDeliveryDatePicker(true)}
-          >
-            <Text>{format(deliveryDate, 'dd/MM/yyyy', { locale: es })}</Text>
-            <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          
-          {showDeliveryDatePicker && (
-            <DateTimePicker
-              value={deliveryDate}
-              mode="date"
-              display="default"
-              onChange={onDeliveryDateChange}
-              minimumDate={new Date()}
-            />
-          )}
+          <CustomDatePicker
+            date={deliveryDate}
+            onDateChange={onDeliveryDateChange}
+            minimumDate={new Date()}
+            label=""
+          />
         </View>
 
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">

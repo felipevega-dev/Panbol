@@ -35,6 +35,7 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const OrdersStack = createNativeStackNavigator<OrdersStackParamList>();
+const AdminStack = createNativeStackNavigator<AdminStackParamList>();
 
 // Navegador de autenticación
 const AuthNavigator = () => (
@@ -67,6 +68,17 @@ const OrdersNavigator = () => (
   </OrdersStack.Navigator>
 );
 
+// Navegador de administración
+const AdminNavigator = () => (
+  <AdminStack.Navigator>
+    <AdminStack.Screen 
+      name="ProductsAdmin" 
+      component={ProductsAdminScreen} 
+      options={{ headerTitle: 'Administrar Productos' }}
+    />
+  </AdminStack.Navigator>
+);
+
 // Navegador principal con pestañas
 const MainNavigator = () => (
   <MainTab.Navigator
@@ -80,6 +92,8 @@ const MainNavigator = () => (
           iconName = focused ? 'add-circle' : 'add-circle-outline';
         } else if (route.name === 'Profile') {
           iconName = focused ? 'person' : 'person-outline';
+        } else if (route.name === 'Admin') {
+          iconName = focused ? 'settings' : 'settings-outline';
         }
 
         return <Ionicons name={iconName} size={size} color={color} />;
@@ -102,6 +116,14 @@ const MainNavigator = () => (
       name="Profile" 
       component={ProfileScreen} 
       options={{ title: 'Perfil' }}
+    />
+    <MainTab.Screen 
+      name="Admin" 
+      component={AdminNavigator} 
+      options={{ 
+        headerShown: false,
+        title: 'Administrar', 
+      }}
     />
   </MainTab.Navigator>
 );
