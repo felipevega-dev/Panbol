@@ -16,64 +16,48 @@ import { format } from 'date-fns';
 
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
-import { Product } from '../../types';
-import { PREDEFINED_PRODUCTS } from '../../constants/products';
+import { ProductWithQuantity, OrderWithDetails } from '../../types';
+
+// URL de imagen placeholder para productos sin imagen
+const placeholderImage = 'https://via.placeholder.com/150';
 
 type Props = OrdersScreenProps<'EditOrder'>;
 
 const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { order } = route.params;
-  const { updateOrder, loading, isEditable } = useOrders();
+  const { order } = route.params as { order: OrderWithDetails };
+  const { updateExistingOrder, loading, canEditOrder } = useOrders();
 
   // Verificar si el pedido es editable
   useEffect(() => {
-    if (!isEditable(order)) {
+    if (!canEditOrder(order)) {
       Alert.alert(
         'No Editable',
         'Este pedido ya no puede ser editado porque ha pasado el límite de tiempo (20:00 del mismo día).',
         [{ text: 'Volver', onPress: () => navigation.goBack() }]
       );
     }
-  }, [order, isEditable, navigation]);
+  }, [order, canEditOrder, navigation]);
   
   // Estado para los productos seleccionados
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>(() => {
-    // Combinar productos predefinidos con los del pedido actual
-    const productMap = new Map<string, Product>();
-    
-    // Inicializar con todos los productos predefinidos con cantidad 0
-    PREDEFINED_PRODUCTS.forEach(product => {
-      productMap.set(product.id, { ...product, quantity: 0 });
-    });
-    
-    // Actualizar con las cantidades del pedido actual
-    order.products.forEach(product => {
-      if (productMap.has(product.id)) {
-        productMap.set(product.id, { ...product });
-      } else {
-        // Para productos que estaban en el pedido pero ya no están en los predefinidos
-        productMap.set(product.id, product);
-      }
-    });
-    
-    return Array.from(productMap.values());
+  const [selectedProducts, setSelectedProducts] = useState<ProductWithQuantity[]>(() => {
+    return order.productos || [];
   });
   
   // Estado para las fechas
-  const [orderDate, setOrderDate] = useState(new Date(order.orderDate));
-  const [deliveryDate, setDeliveryDate] = useState(new Date(order.deliveryDate));
+  const [orderDate, setOrderDate] = useState(new Date(order.fechaPedido));
+  const [deliveryDate, setDeliveryDate] = useState(new Date(order.fechaEntrega));
   const [showOrderDatePicker, setShowOrderDatePicker] = useState(false);
   const [showDeliveryDatePicker, setShowDeliveryDatePicker] = useState(false);
   
   // Estado para observaciones
-  const [observations, setObservations] = useState(order.observations);
+  const [observations, setObservations] = useState(order.observaciones || '');
 
   // Cambiar cantidad de un producto
   const changeQuantity = (id: string, amount: number) => {
     setSelectedProducts(prevProducts => 
       prevProducts.map(product => 
         product.id === id 
-          ? { ...product, quantity: Math.max(0, product.quantity + amount) } 
+          ? { ...product, cantidad: Math.max(0, product.cantidad + amount) } 
           : product
       )
     );
@@ -97,32 +81,29 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
   // Validar y actualizar el pedido
   const handleUpdateOrder = async () => {
     // Filtrar productos con cantidad > 0
-    const productsToOrder = selectedProducts.filter(product => product.quantity > 0);
+    const productsToOrder = selectedProducts.filter(product => product.cantidad > 0);
     
     if (productsToOrder.length === 0) {
       Alert.alert('Error', 'Debes seleccionar al menos un producto');
       return;
     }
     
-    if (deliveryDate < orderDate) {
-      Alert.alert('Error', 'La fecha de entrega no puede ser anterior a la fecha del pedido');
-      return;
-    }
-    
     try {
-      await updateOrder(order.id, {
-        products: productsToOrder,
-        orderDate: orderDate.toISOString(),
-        deliveryDate: deliveryDate.toISOString(),
-        observations
-      });
+      await updateExistingOrder(
+        order.id,
+        {
+          fechaEntrega: deliveryDate,
+          observaciones: observations
+        },
+        productsToOrder
+      );
       
       Alert.alert(
         'Pedido Actualizado',
         'Tu pedido ha sido actualizado exitosamente',
         [
           { 
-            text: 'Ver Detalle', 
+            text: 'Ver Detalles', 
             onPress: () => navigation.navigate('OrderDetail', { orderId: order.id })
           }
         ]
@@ -137,53 +118,51 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // Calcular total del pedido
   const totalAmount = selectedProducts
-    .reduce((sum, product) => sum + (product.price * product.quantity), 0);
+    .reduce((sum, product) => sum + (product.precio * product.cantidad), 0);
     
   const totalItems = selectedProducts
-    .reduce((sum, product) => sum + product.quantity, 0);
+    .reduce((sum, product) => sum + product.cantidad, 0);
 
   return (
     <ScrollView className="flex-1 bg-gray-100">
       <View className="p-4 bg-white border-b border-gray-200">
-        <Text className="text-xl font-bold text-gray-800">Editar Pedido</Text>
-        <Text className="text-gray-600">Pedido #{order.id.substring(0, 8)}</Text>
+        <Text className="text-xl font-bold text-gray-800">Editar Pedido #{order.id.substring(0, 8)}</Text>
+        <Text className="text-gray-600">Modifica los productos o detalles de tu pedido</Text>
       </View>
 
       <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-2">Productos</Text>
-
+        <Text className="text-lg font-bold text-gray-800 mb-4">Productos</Text>
+        
         {selectedProducts.map((product) => (
           <View 
             key={product.id} 
             className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row items-center"
           >
             <Image 
-              source={{ uri: product.image }} 
+              source={{ uri: product.imagen || placeholderImage }} 
               className="w-20 h-20 rounded-md mr-3"
-              defaultSource={require('../../assets/product-placeholder.png')}
             />
             
             <View className="flex-1">
-              <Text className="text-gray-800 font-bold">{product.name}</Text>
-              <Text className="text-gray-600">${product.price} c/u</Text>
+              <Text className="text-gray-800 font-bold">{product.producto}</Text>
+              <Text className="text-gray-600">${product.precio} c/u</Text>
               
               <View className="flex-row items-center mt-2">
                 <TouchableOpacity
                   className="bg-gray-200 w-8 h-8 rounded-full items-center justify-center"
                   onPress={() => changeQuantity(product.id, -1)}
-                  disabled={product.quantity <= 0 || !isEditable(order)}
+                  disabled={product.cantidad <= 0}
                 >
                   <Ionicons name="remove" size={18} color="#374151" />
                 </TouchableOpacity>
                 
                 <Text className="mx-4 text-lg font-bold text-gray-800 min-w-[30px] text-center">
-                  {product.quantity}
+                  {product.cantidad}
                 </Text>
                 
                 <TouchableOpacity
                   className="bg-blue-500 w-8 h-8 rounded-full items-center justify-center"
                   onPress={() => changeQuantity(product.id, 1)}
-                  disabled={!isEditable(order)}
                 >
                   <Ionicons name="add" size={18} color="white" />
                 </TouchableOpacity>
@@ -194,27 +173,15 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
       </View>
 
       <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-2">Fechas</Text>
+        <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>
         
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
-          <Text className="text-gray-600 mb-2">Fecha del Pedido</Text>
-          <TouchableOpacity
-            className="border border-gray-300 p-3 rounded-md flex-row justify-between items-center"
-            onPress={() => setShowOrderDatePicker(true)}
-            disabled={!isEditable(order)}
-          >
+          <Text className="text-gray-600 mb-2">Fecha de Pedido</Text>
+          <View className="border border-gray-300 p-3 rounded-md flex-row justify-between items-center bg-gray-100">
             <Text>{format(orderDate, 'dd/MM/yyyy')}</Text>
             <Ionicons name="calendar-outline" size={20} color="#6B7280" />
-          </TouchableOpacity>
-          
-          {showOrderDatePicker && (
-            <DateTimePicker
-              value={orderDate}
-              mode="date"
-              display="default"
-              onChange={onOrderDateChange}
-            />
-          )}
+          </View>
+          <Text className="text-xs text-gray-500 mt-1">La fecha de pedido no se puede modificar</Text>
         </View>
         
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
@@ -222,7 +189,6 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
           <TouchableOpacity
             className="border border-gray-300 p-3 rounded-md flex-row justify-between items-center"
             onPress={() => setShowDeliveryDatePicker(true)}
-            disabled={!isEditable(order)}
           >
             <Text>{format(deliveryDate, 'dd/MM/yyyy')}</Text>
             <Ionicons name="calendar-outline" size={20} color="#6B7280" />
@@ -234,55 +200,53 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
               mode="date"
               display="default"
               onChange={onDeliveryDateChange}
+              minimumDate={new Date()}
             />
           )}
         </View>
-      </View>
 
-      <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-2">Observaciones</Text>
         <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
+          <Text className="text-gray-600 mb-2">Observaciones</Text>
           <TextInput
-            className="border border-gray-300 p-3 rounded-md"
-            placeholder="Especifica cualquier detalle adicional sobre el pedido"
-            multiline
-            numberOfLines={4}
+            className="border border-gray-300 p-3 rounded-md min-h-[100px]"
             value={observations}
             onChangeText={setObservations}
+            placeholder="Escribe instrucciones especiales o detalles adicionales aquí..."
+            multiline
             textAlignVertical="top"
-            editable={isEditable(order)}
           />
         </View>
-      </View>
 
-      <View className="bg-white p-4 shadow-sm">
-        <View className="flex-row justify-between mb-4">
-          <Text className="text-gray-600">Total Productos:</Text>
-          <Text className="text-gray-800 font-bold">{totalItems}</Text>
-        </View>
-        
-        <View className="flex-row justify-between mb-4">
-          <Text className="text-gray-600">Total a Pagar:</Text>
-          <Text className="text-gray-800 font-bold">${totalAmount.toFixed(2)}</Text>
-        </View>
-        
-        {isEditable(order) ? (
-          <TouchableOpacity
-            className="bg-blue-600 py-3 rounded-lg items-center"
-            onPress={handleUpdateOrder}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text className="text-white font-bold">Actualizar Pedido</Text>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <View className="bg-gray-300 py-3 rounded-lg items-center">
-            <Text className="text-gray-600 font-bold">No Editable</Text>
+        <View className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-gray-600">Total de productos:</Text>
+            <Text className="text-gray-800 font-bold">{totalItems}</Text>
           </View>
-        )}
+          <View className="flex-row justify-between items-center pt-2 border-t border-gray-200">
+            <Text className="text-gray-800 font-medium">Total a pagar:</Text>
+            <Text className="text-xl text-blue-600 font-bold">${totalAmount.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          className={`p-4 rounded-lg items-center mb-4 ${loading ? 'bg-blue-400' : 'bg-blue-600'}`}
+          onPress={handleUpdateOrder}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-white font-bold">Guardar Cambios</Text>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          className="p-4 rounded-lg items-center border border-gray-300"
+          onPress={() => navigation.goBack()}
+          disabled={loading}
+        >
+          <Text className="text-gray-700 font-medium">Cancelar</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

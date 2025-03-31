@@ -159,6 +159,7 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Image 
                   source={{ uri: product.imagen }} 
                   className="w-12 h-12 rounded-md mr-3"
+                  defaultSource={{ uri: 'https://via.placeholder.com/150' }}
                 />
               ) : (
                 <View className="w-12 h-12 bg-gray-200 rounded-md items-center justify-center mr-3">

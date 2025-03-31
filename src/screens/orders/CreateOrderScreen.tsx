@@ -128,7 +128,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
               className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row items-center"
             >
               <Image 
-                source={{ uri: product.imagen }} 
+                source={{ uri: product.imagen || 'https://via.placeholder.com/150' }} 
                 className="w-20 h-20 rounded-md mr-3"
               />
               

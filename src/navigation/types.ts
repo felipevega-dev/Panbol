@@ -14,6 +14,7 @@ export type MainTabParamList = {
   Orders: undefined;
   CreateOrder: undefined;
   Profile: undefined;
+  Admin?: undefined;
 };
 
 // Tipos para la navegación de pedidos
@@ -21,6 +22,11 @@ export type OrdersStackParamList = {
   OrdersList: undefined;
   OrderDetail: { orderId: string };
   EditOrder: { order: Order };
+};
+
+// Tipos para la navegación administrativa
+export type AdminStackParamList = {
+  ProductsAdmin: undefined;
 };
 
 // Tipos para la navegación raíz
@@ -45,4 +51,11 @@ export type OrdersScreenProps<T extends keyof OrdersStackParamList> =
   CompositeScreenProps<
     NativeStackScreenProps<OrdersStackParamList, T>,
     MainTabScreenProps<'Orders'>
+  >;
+
+// Tipo para las propiedades de pantalla de Admin
+export type AdminScreenProps<T extends keyof AdminStackParamList> = 
+  CompositeScreenProps<
+    NativeStackScreenProps<AdminStackParamList, T>,
+    MainTabScreenProps<'Admin'>
   >;

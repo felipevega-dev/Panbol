@@ -11,7 +11,8 @@ import {
   RootStackParamList, 
   AuthStackParamList, 
   MainTabParamList,
-  OrdersStackParamList
+  OrdersStackParamList,
+  AdminStackParamList
 } from './types';
 
 // Importación de pantallas de autenticación
@@ -20,18 +21,14 @@ import { LoginScreen, RegisterScreen } from '../screens/auth';
 // Importación de la pantalla de perfil
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
-// Pantallas temporales para el desarrollo (se reemplazarán más adelante)
-const TemporaryOrdersScreen = () => (
-  <View className="flex-1 items-center justify-center bg-white">
-    <Text className="text-xl">Pantalla de Pedidos</Text>
-  </View>
-);
+// Importación de pantallas de pedidos
+import OrdersScreen from '../screens/orders/OrdersScreen';
+import CreateOrderScreen from '../screens/orders/CreateOrderScreen';
+import OrderDetailScreen from '../screens/orders/OrderDetailScreen';
+import EditOrderScreen from '../screens/orders/EditOrderScreen';
 
-const TemporaryCreateOrderScreen = () => (
-  <View className="flex-1 items-center justify-center bg-white">
-    <Text className="text-xl">Crear Pedido</Text>
-  </View>
-);
+// Importación de pantallas administrativas
+import ProductsAdminScreen from '../screens/admin/ProductsAdminScreen';
 
 // Creación de los navegadores
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -52,8 +49,20 @@ const OrdersNavigator = () => (
   <OrdersStack.Navigator>
     <OrdersStack.Screen 
       name="OrdersList" 
-      component={TemporaryOrdersScreen} 
+      component={OrdersScreen} 
       options={{ headerTitle: 'Mis Pedidos' }}
+    />
+    <OrdersStack.Screen 
+      name="OrderDetail" 
+      component={OrderDetailScreen} 
+      options={({ route }) => ({ 
+        headerTitle: `Pedido #${route.params.orderId.substring(0, 8)}` 
+      })}
+    />
+    <OrdersStack.Screen 
+      name="EditOrder" 
+      component={EditOrderScreen} 
+      options={{ headerTitle: 'Editar Pedido' }}
     />
   </OrdersStack.Navigator>
 );
@@ -86,7 +95,7 @@ const MainNavigator = () => (
     />
     <MainTab.Screen 
       name="CreateOrder" 
-      component={TemporaryCreateOrderScreen} 
+      component={CreateOrderScreen} 
       options={{ title: 'Crear Pedido' }}
     />
     <MainTab.Screen 

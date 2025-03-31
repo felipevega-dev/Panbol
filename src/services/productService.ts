@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import { Product } from '../types';
 
@@ -57,6 +57,51 @@ export const getProductsByCategory = async (category: string): Promise<Product[]
       .filter(product => product.categoria === category);
   } catch (error) {
     console.error('Error obteniendo productos por categoría:', error);
+    throw error;
+  }
+};
+
+/**
+ * Crea un nuevo producto
+ */
+export const createProduct = async (productData: Omit<Product, 'id'>): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, PRODUCTS_COLLECTION), {
+      ...productData,
+      createdAt: serverTimestamp()
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creando producto:', error);
+    throw error;
+  }
+};
+
+/**
+ * Actualiza un producto existente
+ */
+export const updateProduct = async (productId: string, productData: Partial<Product>): Promise<void> => {
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId);
+    await updateDoc(docRef, {
+      ...productData,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error actualizando producto:', error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina un producto existente
+ */
+export const deleteProduct = async (productId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, PRODUCTS_COLLECTION, productId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error eliminando producto:', error);
     throw error;
   }
 };
