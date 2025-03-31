@@ -9,7 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  Switch
+  Switch,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -40,6 +41,10 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   // Estado para observaciones y día feriado
   const [observations, setObservations] = useState('');
   const [isHoliday, setIsHoliday] = useState(false);
+
+  // Estado para modal de éxito
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [newOrderId, setNewOrderId] = useState('');
 
   // Cambiar cantidad de un producto
   const handleQuantityChange = (productId: string, quantity: number) => {
@@ -73,16 +78,9 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
         productsToOrder
       );
       
-      Alert.alert(
-        'Pedido Creado',
-        'Tu pedido ha sido creado exitosamente',
-        [
-          { 
-            text: 'Ver Pedidos', 
-            onPress: () => navigation.navigate('Orders')
-          }
-        ]
-      );
+      // Mostrar modal de éxito en lugar de alerta
+      setNewOrderId('ID del pedido'); // Reemplazar con el ID real del pedido
+      setShowSuccessModal(true);
       
       // Resetear el formulario
       resetSelectedProducts();
@@ -142,7 +140,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
                 {category}
               </Text>
               
-              <View className={Platform.OS === 'web' ? "grid grid-cols-2 gap-3" : ""}>
+              <View className={Platform.OS === 'web' ? "grid grid-cols-3 gap-2" : ""}>
                 {items.map((product) => (
                   <View 
                     key={product.id} 
@@ -150,7 +148,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
                   >
                     <Image 
                       source={{ uri: product.imagen || placeholderImage }} 
-                      className="w-20 h-20 rounded-md mr-3"
+                      className="w-16 h-16 rounded-md mr-3"
                       defaultSource={{ uri: placeholderImage }}
                     />
                     
@@ -167,9 +165,20 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
                           <Ionicons name="remove" size={18} color="#374151" />
                         </TouchableOpacity>
                         
-                        <Text className="mx-4 text-lg font-bold text-gray-800 min-w-[30px] text-center">
-                          {product.cantidad}
-                        </Text>
+                        <TextInput
+                          className="mx-2 text-lg font-bold text-center border border-gray-300 rounded min-w-[40px] p-1"
+                          value={product.cantidad.toString()}
+                          onChangeText={(text) => {
+                            const newValue = parseInt(text);
+                            if (!isNaN(newValue) && newValue >= 0) {
+                              handleQuantityChange(product.id, newValue);
+                            } else if (text === '') {
+                              // Permitir borrar todo el texto
+                              handleQuantityChange(product.id, 0);
+                            }
+                          }}
+                          keyboardType="numeric"
+                        />
                         
                         <TouchableOpacity
                           className="bg-blue-500 w-8 h-8 rounded-full items-center justify-center"
@@ -229,11 +238,6 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
           <Text className="font-bold text-gray-800">{totalItems}</Text>
         </View>
         
-        <View className="flex-row justify-between mb-4">
-          <Text className="text-gray-600">Total a pagar:</Text>
-          <Text className="font-bold text-gray-800">${totalAmount.toFixed(2)}</Text>
-        </View>
-        
         <TouchableOpacity
           className="bg-blue-500 p-4 rounded-lg items-center justify-center"
           onPress={handleCreateOrder}
@@ -245,12 +249,45 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
             <>
               <Text className="text-white font-bold text-lg">Crear Pedido</Text>
               <Text className="text-white text-sm mt-1">
-                {totalItems === 0 ? 'Selecciona al menos un producto' : `${totalItems} productos | $${totalAmount.toFixed(2)}`}
+                {totalItems === 0 ? 'Selecciona al menos un producto' : `${totalItems} productos`}
               </Text>
             </>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Modal de éxito */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-lg p-6 w-11/12 max-w-md">
+            <View className="items-center mb-4">
+              <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-3">
+                <Ionicons name="checkmark" size={32} color="#22c55e" />
+              </View>
+              <Text className="text-2xl font-bold text-gray-800">¡Pedido Creado!</Text>
+              <Text className="text-gray-600 text-center mt-2">
+                Tu pedido ha sido creado exitosamente con el ID: {newOrderId.substring(0, 8)}
+              </Text>
+            </View>
+            
+            <View className="flex-row justify-center mt-4">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  navigation.navigate('Orders');
+                }}
+                className="bg-green-500 py-3 px-6 rounded-lg"
+              >
+                <Text className="text-white font-bold">Ver Mis Pedidos</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
