@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -7,6 +7,10 @@ import { es } from 'date-fns/locale';
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
 import { OrderWithDetails } from '../../types';
+import { exportOrderToCsv } from '../../utils/exportCsv';
+
+// URL de imagen placeholder para productos sin imagen
+const placeholderImage = 'https://via.placeholder.com/150/CCCCCC/888888?text=Sin+Imagen';
 
 type Props = OrdersScreenProps<'OrderDetail'>;
 
@@ -58,161 +62,130 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  const formatDate = (dateString: string | Date) => {
+  const handleExportCSV = () => {
+    if (!selectedOrder) {
+      Alert.alert('Error', 'No hay datos de pedido para exportar');
+      return;
+    }
+    
+    if (Platform.OS !== 'web') {
+      Alert.alert('Exportación CSV', 'La exportación a CSV solo está disponible en la versión web.');
+      return;
+    }
+    
     try {
-      const date = dateString instanceof Date ? dateString : new Date(dateString);
-      return format(date, 'dd MMMM yyyy', { locale: es });
+      const success = exportOrderToCsv(selectedOrder);
+      
+      if (success) {
+        Alert.alert('Éxito', 'El pedido ha sido exportado a CSV correctamente');
+      } else {
+        Alert.alert('Error', 'No se pudo exportar el pedido a CSV');
+      }
     } catch (error) {
-      return String(dateString);
+      Alert.alert('Error', 'Ocurrió un error al exportar a CSV');
+      console.error(error);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'ENTREGADO':
-        return 'bg-green-500';
-      case 'CANCELADO':
-        return 'bg-red-500';
-      case 'PENDIENTE':
-      default:
-        return 'bg-blue-500';
-    }
-  };
-
-  if (loading) {
+  if (loading || !selectedOrder) {
     return (
-      <View className="flex-1 justify-center items-center bg-gray-100">
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text className="mt-4 text-gray-600">Cargando detalle del pedido...</Text>
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#0284c7" />
+        <Text className="mt-2 text-gray-600">Cargando detalles del pedido...</Text>
       </View>
     );
   }
 
-  if (!selectedOrder) {
-    return (
-      <View className="flex-1 justify-center items-center bg-gray-100 p-4">
-        <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-        <Text className="mt-4 text-gray-800 text-lg font-bold">Pedido no encontrado</Text>
-        <Text className="mt-2 text-gray-600 text-center">
-          No se pudo encontrar el pedido solicitado. Puede que haya sido eliminado o no tengas permisos para verlo.
-        </Text>
-        <TouchableOpacity
-          className="mt-6 bg-blue-600 px-4 py-2 rounded-lg"
-          onPress={() => navigation.goBack()}
-        >
-          <Text className="text-white font-medium">Volver a la lista</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const order = selectedOrder;
-  const canEdit = canEditOrder(order);
-  const totalAmount = order.productos.reduce((sum, product) => sum + (product.precio * product.cantidad), 0);
+  const isEditable = canEditOrder(selectedOrder);
+  const totalItems = selectedOrder.productos.reduce((sum, p) => sum + p.cantidad, 0);
 
   return (
     <ScrollView className="flex-1 bg-gray-100">
-      <View className="bg-white p-4 mb-4 shadow-sm">
-        <View className="flex-row justify-between items-center">
-          <Text className="text-2xl font-bold text-gray-800">Pedido #{order.id.substring(0, 8)}</Text>
-          <View className={`px-3 py-1 rounded-full ${getStatusColor(order.estado)}`}>
-            <Text className="text-white font-medium">{order.estado}</Text>
-          </View>
+      <View className="p-4 bg-white border-b border-gray-200">
+        <Text className="text-xl font-bold text-gray-800">Pedido #{selectedOrder.id.substring(0, 8)}</Text>
+        <View className="flex-row items-center mt-1">
+          <View className={`h-2 w-2 rounded-full mr-2 ${selectedOrder.estado === 'PENDIENTE' ? 'bg-orange-500' : selectedOrder.estado === 'ENTREGADO' ? 'bg-green-500' : 'bg-red-500'}`} />
+          <Text className="text-gray-600">{selectedOrder.estado}</Text>
         </View>
-
-        <View className="mt-4 flex-row justify-between">
-          <View>
-            <Text className="text-gray-500">Fecha Pedido</Text>
-            <Text className="text-gray-800 font-medium">{formatDate(order.fechaPedido)}</Text>
-          </View>
-          <View>
-            <Text className="text-gray-500">Fecha Entrega</Text>
-            <Text className="text-gray-800 font-medium">{formatDate(order.fechaEntrega)}</Text>
-          </View>
-        </View>
-        
-        {order.esFeriado && (
-          <View className="mt-4 bg-red-50 p-2 rounded-md flex-row items-center">
-            <Ionicons name="calendar" size={20} color="#EF4444" />
-            <Text className="ml-2 text-red-600 font-medium">Día Feriado</Text>
-          </View>
-        )}
-        
-        {canEdit && (
-          <View className="mt-4 bg-blue-50 p-2 rounded-md">
-            <Text className="text-blue-600">
-              <Ionicons name="information-circle-outline" size={16} /> Este pedido puede editarse hasta las 20:00 de hoy.
-            </Text>
-          </View>
-        )}
       </View>
 
-      <View className="bg-white p-4 mb-4 shadow-sm">
-        <Text className="text-xl font-bold text-gray-800 mb-4">Productos</Text>
-        {order.productos.map((product, index) => (
-          <View 
-            key={`${product.id}-${index}`}
-            className="flex-row justify-between items-center py-3 border-b border-gray-200"
+      <View className="p-4">
+        <View className="flex-row justify-between mb-4">
+          {isEditable && (
+            <TouchableOpacity 
+              className="bg-blue-500 py-2 px-4 rounded-md flex-row items-center"
+              onPress={handleEditOrder}
+            >
+              <Ionicons name="create-outline" size={20} color="white" className="mr-1" />
+              <Text className="text-white font-bold">Editar</Text>
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity 
+            className="bg-red-500 py-2 px-4 rounded-md flex-row items-center"
+            onPress={handleDeleteOrder}
           >
-            <View className="flex-row items-center">
-              {product.imagen ? (
-                <Image 
-                  source={{ uri: product.imagen }} 
-                  className="w-12 h-12 rounded-md mr-3"
-                  defaultSource={{ uri: 'https://via.placeholder.com/150' }}
-                />
-              ) : (
-                <View className="w-12 h-12 bg-gray-200 rounded-md items-center justify-center mr-3">
-                  <Ionicons name="cube-outline" size={24} color="#6B7280" />
-                </View>
-              )}
-              <View>
-                <Text className="text-gray-800 font-medium">{product.producto}</Text>
-                <Text className="text-gray-500">${product.precio.toFixed(2)}</Text>
-              </View>
+            <Ionicons name="trash-outline" size={20} color="white" className="mr-1" />
+            <Text className="text-white font-bold">Eliminar</Text>
+          </TouchableOpacity>
+
+          {Platform.OS === 'web' && (
+            <TouchableOpacity 
+              className="bg-green-500 py-2 px-4 rounded-md flex-row items-center"
+              onPress={handleExportCSV}
+            >
+              <Ionicons name="download-outline" size={20} color="white" className="mr-1" />
+              <Text className="text-white font-bold">Exportar CSV</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
+          <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>
+          
+          <View className="flex-row mb-2">
+            <Text className="text-gray-600 font-medium w-1/3">Fecha de Pedido:</Text>
+            <Text className="text-gray-800">{format(new Date(selectedOrder.fechaPedido), 'dd/MM/yyyy', { locale: es })}</Text>
+          </View>
+          
+          <View className="flex-row mb-2">
+            <Text className="text-gray-600 font-medium w-1/3">Fecha de Entrega:</Text>
+            <Text className="text-gray-800">{format(new Date(selectedOrder.fechaEntrega), 'dd/MM/yyyy', { locale: es })}</Text>
+          </View>
+          
+          <View className="flex-row mb-2">
+            <Text className="text-gray-600 font-medium w-1/3">Es Feriado:</Text>
+            <Text className="text-gray-800">{selectedOrder.esFeriado ? 'Sí' : 'No'}</Text>
+          </View>
+          
+          {selectedOrder.observaciones && (
+            <View className="mb-2">
+              <Text className="text-gray-600 font-medium">Observaciones:</Text>
+              <Text className="text-gray-800 mt-1 p-2 bg-gray-50 rounded">{selectedOrder.observaciones}</Text>
             </View>
-            <View className="items-end">
-              <Text className="text-gray-800 font-medium">x{product.cantidad}</Text>
-              <Text className="text-gray-600">${(product.precio * product.cantidad).toFixed(2)}</Text>
+          )}
+        </View>
+
+        <Text className="text-lg font-bold text-gray-800 mb-2">Productos ({totalItems})</Text>
+        
+        {selectedOrder.productos.map((product) => (
+          <View 
+            key={product.id} 
+            className="flex-row items-center bg-white p-3 rounded-lg shadow-sm mb-2"
+          >
+            <Image 
+              source={{ uri: product.imagen || placeholderImage }} 
+              className="w-16 h-16 rounded mr-3"
+              defaultSource={{ uri: placeholderImage }}
+            />
+            
+            <View className="flex-1">
+              <Text className="font-bold text-gray-800">{product.producto}</Text>
+              <Text className="text-gray-500">{product.categoria}</Text>
+              <Text className="text-gray-700 font-medium">Cantidad: {product.cantidad}</Text>
             </View>
           </View>
         ))}
-        
-        <View className="mt-4 pt-4 border-t border-gray-200">
-          <View className="flex-row justify-between">
-            <Text className="text-gray-600">Subtotal</Text>
-            <Text className="text-gray-800 font-bold">${totalAmount.toFixed(2)}</Text>
-          </View>
-        </View>
-      </View>
-
-      {order.observaciones && (
-        <View className="bg-white p-4 mb-4 shadow-sm">
-          <Text className="text-xl font-bold text-gray-800 mb-2">Observaciones</Text>
-          <Text className="text-gray-600">{order.observaciones}</Text>
-        </View>
-      )}
-
-      <View className="p-4 flex-row justify-between">
-        {canEdit ? (
-          <TouchableOpacity
-            className="bg-blue-600 flex-1 py-3 rounded-lg items-center mr-2"
-            onPress={handleEditOrder}
-          >
-            <Text className="text-white font-bold">Editar Pedido</Text>
-          </TouchableOpacity>
-        ) : (
-          <View className="bg-gray-300 flex-1 py-3 rounded-lg items-center mr-2">
-            <Text className="text-gray-600 font-bold">No Editable</Text>
-          </View>
-        )}
-        
-        <TouchableOpacity
-          className="bg-red-600 flex-1 py-3 rounded-lg items-center ml-2"
-          onPress={handleDeleteOrder}
-        >
-          <Text className="text-white font-bold">Eliminar</Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );

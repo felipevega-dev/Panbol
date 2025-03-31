@@ -20,6 +20,8 @@ import { useOrders } from '../../contexts/OrderContext';
 import { ProductWithQuantity } from '../../types';
 import CustomDatePicker from '../../components/CustomDatePicker';
 
+const placeholderImage = 'https://via.placeholder.com/150';
+
 type Props = MainTabScreenProps<'CreateOrder'>;
 
 const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
@@ -102,6 +104,20 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   const totalItems = availableProducts
     .reduce((sum, product) => sum + product.cantidad, 0);
 
+  // Agrupar productos por categoría
+  const groupedProducts = () => {
+    // Obtener todas las categorías únicas
+    const categories = [...new Set(availableProducts.map(p => p.categoria))].sort();
+    
+    // Crear un objeto con las categorías como claves
+    return categories.map(category => ({
+      category,
+      items: availableProducts.filter(p => p.categoria === category).sort((a, b) => 
+        a.producto.localeCompare(b.producto)
+      )
+    }));
+  };
+
   return (
     <ScrollView className="flex-1 bg-gray-100">
       <View className="p-4 bg-white border-b border-gray-200">
@@ -119,42 +135,52 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
       {!loading && (
         <View className="p-4">
           <Text className="text-lg font-bold text-gray-800 mb-2">Productos Disponibles</Text>
-
-          {availableProducts.map((product) => (
-            <View 
-              key={product.id} 
-              className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row items-center"
-            >
-              <Image 
-                source={{ uri: product.imagen || 'https://via.placeholder.com/150' }} 
-                className="w-20 h-20 rounded-md mr-3"
-              />
+          
+          {groupedProducts().map(({ category, items }) => (
+            <View key={category} className="mb-4">
+              <Text className="text-lg font-bold mb-2 text-gray-700 bg-gray-100 p-2 rounded">
+                {category}
+              </Text>
               
-              <View className="flex-1">
-                <Text className="text-gray-800 font-bold">{product.producto}</Text>
-                <Text className="text-gray-500 text-sm">{product.categoria}</Text>
-                <Text className="text-gray-600">${product.precio} c/u</Text>
-                
-                <View className="flex-row items-center mt-2">
-                  <TouchableOpacity
-                    className="bg-gray-200 w-8 h-8 rounded-full items-center justify-center"
-                    onPress={() => handleQuantityChange(product.id, Math.max(0, product.cantidad - 1))}
-                    disabled={product.cantidad <= 0}
+              <View className={Platform.OS === 'web' ? "grid grid-cols-2 gap-3" : ""}>
+                {items.map((product) => (
+                  <View 
+                    key={product.id} 
+                    className="bg-white rounded-lg shadow-sm p-4 mb-3 flex-row items-center"
                   >
-                    <Ionicons name="remove" size={18} color="#374151" />
-                  </TouchableOpacity>
-                  
-                  <Text className="mx-4 text-lg font-bold text-gray-800 min-w-[30px] text-center">
-                    {product.cantidad}
-                  </Text>
-                  
-                  <TouchableOpacity
-                    className="bg-blue-500 w-8 h-8 rounded-full items-center justify-center"
-                    onPress={() => handleQuantityChange(product.id, product.cantidad + 1)}
-                  >
-                    <Ionicons name="add" size={18} color="white" />
-                  </TouchableOpacity>
-                </View>
+                    <Image 
+                      source={{ uri: product.imagen || placeholderImage }} 
+                      className="w-20 h-20 rounded-md mr-3"
+                      defaultSource={{ uri: placeholderImage }}
+                    />
+                    
+                    <View className="flex-1">
+                      <Text className="text-gray-800 font-bold">{product.producto}</Text>
+                      <Text className="text-gray-500 text-sm">{product.categoria}</Text>
+                      
+                      <View className="flex-row items-center mt-2">
+                        <TouchableOpacity
+                          className="bg-gray-200 w-8 h-8 rounded-full items-center justify-center"
+                          onPress={() => handleQuantityChange(product.id, Math.max(0, product.cantidad - 1))}
+                          disabled={product.cantidad <= 0}
+                        >
+                          <Ionicons name="remove" size={18} color="#374151" />
+                        </TouchableOpacity>
+                        
+                        <Text className="mx-4 text-lg font-bold text-gray-800 min-w-[30px] text-center">
+                          {product.cantidad}
+                        </Text>
+                        
+                        <TouchableOpacity
+                          className="bg-blue-500 w-8 h-8 rounded-full items-center justify-center"
+                          onPress={() => handleQuantityChange(product.id, product.cantidad + 1)}
+                        >
+                          <Ionicons name="add" size={18} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
           ))}

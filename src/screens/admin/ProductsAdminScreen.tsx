@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, Alert, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Alert, ScrollView, Image, Platform, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getAllProducts, createProduct, updateProduct, deleteProduct } from '../../services/productService';
 import { Product } from '../../types';
@@ -42,6 +42,7 @@ const ProductsAdminScreen: React.FC = () => {
   const [formValues, setFormValues] = useState<Omit<Product, 'id'>>(initialProduct);
   const [imageUrl, setImageUrl] = useState<string>(placeholderImage);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedProductIdForEdit, setSelectedProductIdForEdit] = useState<string | null>(null);
   const navigation = useNavigation();
 
   // Cargar productos al inicio
@@ -171,7 +172,7 @@ const ProductsAdminScreen: React.FC = () => {
   // Eliminar producto
   const handleDelete = async (productId: string) => {
     Alert.alert(
-      'Confirmar',
+      'Confirmar eliminación',
       '¿Estás seguro de que deseas eliminar este producto?',
       [
         { text: 'Cancelar', style: 'cancel' },
@@ -179,12 +180,15 @@ const ProductsAdminScreen: React.FC = () => {
           text: 'Eliminar', 
           onPress: async () => {
             try {
+              setLoading(true);
               await deleteProduct(productId);
               Alert.alert('Éxito', 'Producto eliminado correctamente');
               loadProducts();
             } catch (error) {
               Alert.alert('Error', 'No se pudo eliminar el producto');
               console.error('Error eliminando producto:', error);
+            } finally {
+              setLoading(false);
             }
           },
           style: 'destructive'
@@ -200,6 +204,141 @@ const ProductsAdminScreen: React.FC = () => {
     }
   };
 
+  // Renderizar formulario de producto como un modal
+  const renderFormModal = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return null;
+    
+    return (
+      <Modal
+        transparent={true}
+        visible={selectedProductIdForEdit === productId}
+        animationType="fade"
+        onRequestClose={() => setSelectedProductIdForEdit(null)}
+      >
+        <TouchableOpacity 
+          activeOpacity={1} 
+          className="flex-1 justify-center items-center bg-black bg-opacity-50"
+          onPress={() => setSelectedProductIdForEdit(null)}
+        >
+          <View 
+            className="bg-white rounded-lg shadow-lg p-4 w-11/12 max-w-xl m-4"
+            onStartShouldSetResponder={() => true}
+          >
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold">Editar: {product.producto}</Text>
+              <TouchableOpacity onPress={() => setSelectedProductIdForEdit(null)}>
+                <Ionicons name="close" size={24} color="#555" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Imagen del producto */}
+            <View className="items-center mb-4">
+              <View className="relative">
+                <Image 
+                  source={{ uri: imageUrl }} 
+                  className="w-24 h-24 rounded-lg"
+                  defaultSource={{ uri: placeholderImage }}
+                />
+                
+                {uploadingImage && (
+                  <View className="absolute top-0 left-0 right-0 bottom-0 bg-black bg-opacity-30 items-center justify-center rounded-lg">
+                    <ActivityIndicator size="small" color="white" />
+                  </View>
+                )}
+              </View>
+              
+              <TouchableOpacity
+                onPress={pickImage}
+                className="mt-2 px-3 py-1 bg-gray-200 rounded-md flex-row items-center"
+                disabled={uploadingImage}
+              >
+                <Ionicons name="camera-outline" size={16} color="#555" style={{ marginRight: 4 }} />
+                <Text className="text-gray-700">Seleccionar imagen</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Nombre del producto */}
+            <View className="mb-4">
+              <Text className="text-gray-700 mb-1">Nombre del Producto*</Text>
+              <TextInput
+                value={formValues.producto}
+                onChangeText={(text) => setFormValues({ ...formValues, producto: text })}
+                className="border border-gray-300 rounded p-2"
+                placeholder="Nombre del producto"
+              />
+            </View>
+            
+            {/* Categoría */}
+            <View className="mb-4">
+              <Text className="text-gray-700 mb-1">Categoría*</Text>
+              {Platform.OS === 'web' ? (
+                <View className="border border-gray-300 rounded overflow-hidden">
+                  <select
+                    value={formValues.categoria}
+                    onChange={(e) => setFormValues({ ...formValues, categoria: e.target.value })}
+                    className="w-full p-2 bg-white"
+                  >
+                    {CATEGORIAS.map(cat => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                  </select>
+                </View>
+              ) : (
+                <View className="border border-gray-300 rounded">
+                  <Picker
+                    selectedValue={formValues.categoria}
+                    onValueChange={(value) => setFormValues({ ...formValues, categoria: value })}
+                  >
+                    {CATEGORIAS.map(cat => (
+                      <Picker.Item key={cat.value} label={cat.label} value={cat.value} />
+                    ))}
+                  </Picker>
+                </View>
+              )}
+            </View>
+            
+            {/* ID del producto (no editable) */}
+            <View className="mb-4">
+              <Text className="text-gray-700 mb-1">ID del Producto</Text>
+              <TextInput
+                value={formValues.productoID.toString()}
+                className="border border-gray-300 rounded p-2 bg-gray-100"
+                editable={false}
+              />
+              <Text className="text-xs text-gray-500 mt-1">ID asignado automáticamente</Text>
+            </View>
+            
+            {/* Botones */}
+            <View className="flex-row justify-end space-x-2 mt-2">
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedProductIdForEdit(null);
+                  setEditingProduct(null);
+                  setFormValues(initialProduct);
+                  setImageUrl(placeholderImage);
+                }}
+                className="px-4 py-2 bg-gray-300 rounded"
+              >
+                <Text>Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => {
+                  handleSubmit();
+                  setSelectedProductIdForEdit(null);
+                }}
+                className="px-4 py-2 bg-blue-500 rounded"
+              >
+                <Text className="text-white">Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
+  };
+  
   // Renderizar formulario de producto
   const renderForm = () => (
     <View className="bg-white p-4 rounded-lg shadow-md mb-4">
@@ -322,40 +461,76 @@ const ProductsAdminScreen: React.FC = () => {
     </View>
   );
 
-  // Renderizar elemento de producto
-  const renderItem = ({ item }: { item: Product }) => (
-    <View className="flex-row items-center justify-between bg-white p-3 mb-2 rounded-lg shadow-sm">
-      <View className="flex-row items-center flex-1">
-        <Image 
-          source={{ uri: item.imagen || placeholderImage }} 
-          className="w-16 h-16 rounded-lg mr-3"
-          defaultSource={{ uri: placeholderImage }}
-        />
-        
-        <View className="flex-1">
-          <Text className="font-bold text-lg">{item.producto}</Text>
-          <Text className="text-gray-500">{item.categoria}</Text>
-          {item.precio > 0 && (
-            <Text className="text-gray-700">Precio: ${item.precio.toFixed(2)}</Text>
-          )}
-        </View>
-      </View>
+  // Agrupar productos por categoría
+  const groupedProducts = () => {
+    // Obtener todas las categorías únicas
+    const categories = [...new Set(products.map(p => p.categoria))].sort();
+    
+    // Crear un objeto con las categorías como claves
+    return categories.map(category => ({
+      category,
+      items: products.filter(p => p.categoria === category).sort((a, b) => 
+        a.producto.localeCompare(b.producto)
+      )
+    }));
+  };
+
+  // Renderizar sección de categoría
+  const renderCategory = ({ category, items }: { category: string, items: Product[] }) => (
+    <View key={category} className="mb-6">
+      <Text className="text-lg font-bold mb-2 text-gray-700 bg-gray-100 p-2 rounded">
+        {category}
+      </Text>
       
-      <View className="flex-row">
-        <TouchableOpacity
-          onPress={() => handleEdit(item)}
-          className="px-3 py-1 bg-blue-100 rounded mr-2"
-        >
-          <Text className="text-blue-800">Editar</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          onPress={() => handleDelete(item.id)}
-          className="px-3 py-1 bg-red-100 rounded"
-        >
-          <Text className="text-red-800">Eliminar</Text>
-        </TouchableOpacity>
-      </View>
+      {items.map(item => (
+        <View key={item.id} className="flex-row items-center justify-between bg-white p-3 mb-2 rounded-lg shadow-sm">
+          <View className="flex-row items-center flex-1">
+            <Image 
+              source={{ uri: item.imagen || placeholderImage }} 
+              className="w-16 h-16 rounded-lg mr-3"
+              defaultSource={{ uri: placeholderImage }}
+            />
+            
+            <View className="flex-1">
+              <Text className="font-bold text-lg">{item.producto}</Text>
+            </View>
+          </View>
+          
+          <View className="flex-row">
+            <TouchableOpacity
+              onPress={() => {
+                setEditingProduct(item);
+                setFormValues({
+                  productoID: item.productoID,
+                  categoria: item.categoria,
+                  producto: item.producto,
+                  imagen: item.imagen,
+                  precio: item.precio
+                });
+                setImageUrl(item.imagen || placeholderImage);
+                
+                // Hacer scroll al formulario si estamos en móvil
+                if (Platform.OS !== 'web') {
+                  setShowForm(true);
+                } else {
+                  // En web, mostrar formulario junto al producto (modal)
+                  setSelectedProductIdForEdit(item.id);
+                }
+              }}
+              className="px-3 py-1 bg-blue-100 rounded mr-2"
+            >
+              <Text className="text-blue-800">Editar</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={() => handleDelete(item.id)}
+              className="px-3 py-1 bg-red-100 rounded"
+            >
+              <Text className="text-red-800">Eliminar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
     </View>
   );
 
@@ -387,6 +562,8 @@ const ProductsAdminScreen: React.FC = () => {
         
         {showForm && renderForm()}
         
+        {selectedProductIdForEdit && renderFormModal(selectedProductIdForEdit)}
+        
         {loading ? (
           <ActivityIndicator size="large" color="#0000ff" className="mt-4" />
         ) : products.length === 0 ? (
@@ -405,9 +582,9 @@ const ProductsAdminScreen: React.FC = () => {
           </View>
         ) : (
           <FlatList
-            data={products}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
+            data={groupedProducts()}
+            renderItem={({ item }) => renderCategory(item)}
+            keyExtractor={(item) => item.category}
             scrollEnabled={false}
           />
         )}
