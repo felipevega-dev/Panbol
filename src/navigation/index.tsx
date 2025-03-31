@@ -3,7 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 
 // Importación de tipos
 import { 
@@ -16,6 +17,9 @@ import {
 // Importación de pantallas de autenticación
 import { LoginScreen, RegisterScreen } from '../screens/auth';
 
+// Importación de la pantalla de perfil
+import ProfileScreen from '../screens/profile/ProfileScreen';
+
 // Pantallas temporales para el desarrollo (se reemplazarán más adelante)
 const TemporaryOrdersScreen = () => (
   <View className="flex-1 items-center justify-center bg-white">
@@ -26,12 +30,6 @@ const TemporaryOrdersScreen = () => (
 const TemporaryCreateOrderScreen = () => (
   <View className="flex-1 items-center justify-center bg-white">
     <Text className="text-xl">Crear Pedido</Text>
-  </View>
-);
-
-const TemporaryProfileScreen = () => (
-  <View className="flex-1 items-center justify-center bg-white">
-    <Text className="text-xl">Perfil de Usuario</Text>
   </View>
 );
 
@@ -93,7 +91,7 @@ const MainNavigator = () => (
     />
     <MainTab.Screen 
       name="Profile" 
-      component={TemporaryProfileScreen} 
+      component={ProfileScreen} 
       options={{ title: 'Perfil' }}
     />
   </MainTab.Navigator>
@@ -101,13 +99,22 @@ const MainNavigator = () => (
 
 // Navegador raíz
 export const AppNavigator = () => {
-  // Aquí eventualmente verificaremos el estado de autenticación
-  const isAuthenticated = false;
+  // Usar el contexto de autenticación para obtener el estado del usuario
+  const { user, loading } = useAuth();
+  
+  // Mostrar un indicador de carga mientras se verifica la autenticación
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center">
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
 
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
+        {user ? (
           <RootStack.Screen name="Main" component={MainNavigator} />
         ) : (
           <RootStack.Screen name="Auth" component={AuthNavigator} />

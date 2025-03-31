@@ -1,41 +1,64 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
+import { useAuth } from '../../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 export const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { login, loginWithGoogle, error: authError, loading: authLoading } = useAuth();
+  
+  // Mostrar errores de autenticación
+  useEffect(() => {
+    if (authError && !authLoading) {
+      Alert.alert('Error de autenticación', authError);
+    }
+  }, [authError, authLoading]);
   
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Por favor ingresa tu email y contraseña');
+      Alert.alert('Campos requeridos', 'Por favor ingresa tu email y contraseña');
       return;
     }
     
-    setLoading(true);
-    setError(null);
+    setIsSubmitting(true);
     
     try {
-      // TODO: Implementar función de login con Firebase
-      console.log('Login con:', email, password);
-      // Simulación temporal de login exitoso
-      setTimeout(() => {
-        setLoading(false);
-      }, 1000);
+      await login(email, password);
+      // Si llegamos aquí, el login fue exitoso
+      // El AuthContext manejará la redirección a la app principal
     } catch (error) {
-      setError('Error al iniciar sesión. Por favor intenta de nuevo.');
-      setLoading(false);
-      console.error(error);
+      // Errores específicos ya son manejados por el useEffect que observa authError
+      console.error('Error de login:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  const handleGoogleLogin = async () => {
+    setIsSubmitting(true);
+    
+    try {
+      await loginWithGoogle();
+      // Si llegamos aquí, el login fue exitoso
+      // El AuthContext manejará la redirección a la app principal
+    } catch (error) {
+      // Errores específicos ya son manejados por el useEffect que observa authError
+      console.error('Error de login con Google:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const loading = isSubmitting || authLoading;
   
   return (
     <View className="flex-1 bg-white">
@@ -45,9 +68,9 @@ export const LoginScreen = () => {
           <Text className="text-lg text-center text-gray-600">Gestión de Pedidos</Text>
         </View>
         
-        {error && (
+        {authError && !loading && (
           <View className="mb-4 p-3 bg-red-100 rounded-md">
-            <Text className="text-red-700">{error}</Text>
+            <Text className="text-red-700">{authError}</Text>
           </View>
         )}
         
@@ -60,6 +83,7 @@ export const LoginScreen = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!loading}
           />
         </View>
         
@@ -71,6 +95,7 @@ export const LoginScreen = () => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            editable={!loading}
           />
         </View>
         
@@ -79,14 +104,36 @@ export const LoginScreen = () => {
           onPress={handleLogin}
           disabled={loading}
         >
-          <Text className="text-white text-center font-bold">
-            {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-white text-center font-bold">
+              Iniciar sesión
+            </Text>
+          )}
+        </TouchableOpacity>
+        
+        <View className="my-4 flex-row items-center">
+          <View className="flex-1 h-0.5 bg-gray-200" />
+          <Text className="mx-4 text-gray-500">O</Text>
+          <View className="flex-1 h-0.5 bg-gray-200" />
+        </View>
+
+        <TouchableOpacity 
+          className="p-3 rounded-md flex-row justify-center items-center bg-white border border-gray-300"
+          onPress={handleGoogleLogin}
+          disabled={loading}
+        >
+          <Ionicons name="logo-google" size={20} color="#DB4437" />
+          <Text className="text-gray-800 text-center font-medium ml-2">
+            Continuar con Google
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          className="mt-4"
+          className="mt-6"
           onPress={() => navigation.navigate('Register')}
+          disabled={loading}
         >
           <Text className="text-center text-blue-600">
             ¿No tienes una cuenta? Regístrate
