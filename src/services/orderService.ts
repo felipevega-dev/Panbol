@@ -250,6 +250,6 @@ const formatFirestoreTimestamp = (timestamp: any): Date | string => {
  */
 const calculateTotal = (products: ProductWithQuantity[]): number => {
   return products.reduce((total, product) => {
-    return total + (product.precio * product.cantidad);
+    return total + ((product.precio || 0) * product.cantidad);
   }, 0);
 };

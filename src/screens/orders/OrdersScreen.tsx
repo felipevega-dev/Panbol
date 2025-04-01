@@ -96,12 +96,6 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
               <Text className="text-gray-600 italic">{item.observaciones}</Text>
             </View>
           )}
-
-          {item.total !== undefined && (
-            <View className="mt-2 flex-row justify-end">
-              <Text className="font-bold text-gray-800">Total: ${item.total.toFixed(2)}</Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     );

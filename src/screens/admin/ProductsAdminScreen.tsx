@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, TextInput, Alert, ScrollView, Image, Platform, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, Alert, ScrollView, Image, Platform, Modal, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getAllProducts, createProduct, updateProduct, deleteProduct } from '../../services/productService';
 import { Product } from '../../types';
@@ -30,8 +30,7 @@ const initialProduct: Omit<Product, 'id'> = {
   productoID: 0,
   categoria: '',
   producto: '',
-  imagen: placeholderImage,
-  precio: 0
+  imagen: placeholderImage
 };
 
 const ProductsAdminScreen: React.FC = () => {
@@ -43,6 +42,7 @@ const ProductsAdminScreen: React.FC = () => {
   const [imageUrl, setImageUrl] = useState<string>(placeholderImage);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedProductIdForEdit, setSelectedProductIdForEdit] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const navigation = useNavigation();
 
   // Cargar productos al inicio
@@ -162,11 +162,17 @@ const ProductsAdminScreen: React.FC = () => {
       productoID: product.productoID,
       categoria: product.categoria,
       producto: product.producto,
-      imagen: product.imagen,
-      precio: product.precio
+      imagen: product.imagen
     });
     setImageUrl(product.imagen || placeholderImage);
     setShowForm(true);
+  };
+
+  // Manejar el refresh al deslizar hacia abajo
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadProducts();
+    setRefreshing(false);
   };
 
   // Eliminar producto
@@ -182,13 +188,13 @@ const ProductsAdminScreen: React.FC = () => {
             try {
               setLoading(true);
               await deleteProduct(productId);
+              setLoading(false);
               Alert.alert('Éxito', 'Producto eliminado correctamente');
               loadProducts();
             } catch (error) {
+              setLoading(false);
               Alert.alert('Error', 'No se pudo eliminar el producto');
               console.error('Error eliminando producto:', error);
-            } finally {
-              setLoading(false);
             }
           },
           style: 'destructive'
@@ -214,16 +220,10 @@ const ProductsAdminScreen: React.FC = () => {
         transparent={true}
         visible={selectedProductIdForEdit === productId}
         animationType="fade"
-        onRequestClose={() => setSelectedProductIdForEdit(null)}
       >
-        <TouchableOpacity 
-          activeOpacity={1} 
-          className="flex-1 justify-center items-center bg-black bg-opacity-50"
-          onPress={() => setSelectedProductIdForEdit(null)}
-        >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
           <View 
             className="bg-white rounded-lg shadow-lg p-4 w-11/12 max-w-xl m-4"
-            onStartShouldSetResponder={() => true}
           >
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-xl font-bold">Editar: {product.producto}</Text>
@@ -334,7 +334,7 @@ const ProductsAdminScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     );
   };
@@ -425,19 +425,6 @@ const ProductsAdminScreen: React.FC = () => {
         <Text className="text-xs text-gray-500 mt-1">ID asignado automáticamente</Text>
       </View>
       
-      <View className="mb-4">
-        <Text className="text-gray-700 mb-1">Precio (opcional)</Text>
-        <TextInput
-          value={formValues.precio.toString()}
-          onChangeText={(text) => 
-            setFormValues({ ...formValues, precio: parseFloat(text) || 0 })
-          }
-          keyboardType="numeric"
-          className="border border-gray-300 rounded p-2"
-          placeholder="0.00"
-        />
-      </View>
-      
       <View className="flex-row justify-end space-x-2">
         <TouchableOpacity
           onPress={() => {
@@ -504,8 +491,7 @@ const ProductsAdminScreen: React.FC = () => {
                   productoID: item.productoID,
                   categoria: item.categoria,
                   producto: item.producto,
-                  imagen: item.imagen,
-                  precio: item.precio
+                  imagen: item.imagen
                 });
                 setImageUrl(item.imagen || placeholderImage);
                 
@@ -535,7 +521,18 @@ const ProductsAdminScreen: React.FC = () => {
   );
 
   return (
-    <ScrollView className="flex-1 bg-gray-100">
+    <ScrollView 
+      className="flex-1 bg-gray-100"
+      refreshControl={
+        Platform.OS !== 'web' ? 
+        <RefreshControl 
+          refreshing={refreshing} 
+          onRefresh={onRefresh}
+          colors={['#0000ff']}
+          tintColor="#0000ff"
+        /> : undefined
+      }
+    >
       <View className="p-4">
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-2xl font-bold text-gray-800">Administrar Productos</Text>

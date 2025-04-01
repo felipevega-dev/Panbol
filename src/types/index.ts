@@ -4,7 +4,7 @@ export interface Product {
   categoria: string;          // Categoría del producto
   producto: string;           // Nombre del producto
   imagen: string;             // URL de la imagen
-  precio: number;             // Precio unitario
+  precio?: number;            // Precio unitario (opcional)
 }
 
 export interface OrderDetail {
