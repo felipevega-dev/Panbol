@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,21 +11,28 @@ import { Order } from '../../types';
 type Props = OrdersScreenProps<'OrdersList'>;
 
 const OrdersScreen: React.FC<Props> = ({ navigation }) => {
-  const { orders, loading, getOrders, exportOrdersToCSV, canEditOrder } = useOrders();
+  const { orders, loading, getOrders, exportOrdersToExcel, canEditOrder } = useOrders();
 
   useEffect(() => {
     getOrders();
   }, []);
 
-  const handleExportCSV = async () => {
+  const handleExportExcel = async () => {
     if (loading) return;
     
     try {
-      const filePath = await exportOrdersToCSV();
-      Alert.alert(
-        'Exportación exitosa',
-        `Los pedidos han sido exportados a: ${filePath}`
-      );
+      const result = await exportOrdersToExcel();
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          'Exportación exitosa',
+          'Los pedidos han sido exportados a Excel correctamente'
+        );
+      } else if (typeof result === 'string') {
+        Alert.alert(
+          'Exportación exitosa',
+          `Los pedidos han sido exportados a: ${result}`
+        );
+      }
     } catch (error) {
       Alert.alert(
         'Error',
@@ -107,7 +114,7 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
         <Text className="text-xl font-bold text-gray-800">Mis Pedidos</Text>
         <TouchableOpacity
           className="flex-row items-center bg-blue-600 px-3 py-2 rounded-lg"
-          onPress={handleExportCSV}
+          onPress={handleExportExcel}
           disabled={loading || orders.length === 0}
         >
           {loading ? (
@@ -115,7 +122,7 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
           ) : (
             <>
               <Ionicons name="download-outline" size={18} color="white" />
-              <Text className="ml-1 text-white font-medium">Exportar CSV</Text>
+              <Text className="ml-1 text-white font-medium">Exportar Excel</Text>
             </>
           )}
         </TouchableOpacity>

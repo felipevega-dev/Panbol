@@ -103,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loading: false,
         error: error instanceof Error ? error.message : 'Error durante el inicio de sesión con Google'
       }));
-      throw error; // Re-lanzar para que se maneje en el componente
+      throw error;
     }
   };
 
@@ -137,14 +137,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const handleLogout = async () => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      await logoutService();
+      // El efecto onAuthStateChanged se encargará de actualizar el estado
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Error durante el cierre de sesión'
+      }));
+      throw error; // Re-lanzar para que se maneje en el componente
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      ...state, 
-      login, 
-      loginWithGoogle: handleGoogleLogin,
-      register, 
-      logout 
-    }}>
+    <AuthContext.Provider 
+      value={{
+        ...state,
+        login,
+        loginWithGoogle: handleGoogleLogin,
+        register,
+        logout: handleLogout
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

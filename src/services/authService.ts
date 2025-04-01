@@ -5,6 +5,8 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -97,7 +99,23 @@ export const loginWithEmail = async (
 export const loginWithGoogle = async (): Promise<User> => {
   try {
     const provider = new GoogleAuthProvider();
-    const userCredential = await signInWithPopup(auth, provider);
+    
+    // Usar diferentes métodos según la plataforma
+    let userCredential;
+    
+    if (typeof window !== 'undefined' && window.navigator.userAgent.includes('Mobile')) {
+      // En dispositivos móviles en web, usar redirect (más compatible)
+      await signInWithRedirect(auth, provider);
+      userCredential = await getRedirectResult(auth);
+    } else {
+      // En desktop, usar popup
+      userCredential = await signInWithPopup(auth, provider);
+    }
+    
+    if (!userCredential) {
+      throw new Error('No se pudo completar la autenticación con Google');
+    }
+    
     const firebaseUser = userCredential.user;
     
     // Verificar si el usuario ya existe en Firestore

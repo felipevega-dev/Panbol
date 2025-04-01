@@ -19,6 +19,7 @@ import {
   deleteOrder
 } from '../services/orderService';
 import { getAllProducts } from '../services/productService';
+import { exportOrdersToExcel as exportToExcel } from '../utils/exportOrdersExcel';
 
 interface OrderContextState {
   orders: Order[];
@@ -35,6 +36,7 @@ interface OrderContextValue extends OrderContextState {
   updateExistingOrder: (orderId: string, orderData: Partial<Order>, products: ProductWithQuantity[]) => Promise<void>;
   removeOrder: (orderId: string) => Promise<void>;
   exportOrdersToCSV: () => Promise<string>;
+  exportOrdersToExcel: () => Promise<string | boolean>;
   selectProduct: (productId: string, quantity: number) => void;
   resetSelectedProducts: () => void;
   loadAvailableProducts: () => Promise<void>;
@@ -234,8 +236,8 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
             order.useremail,
             product.producto,
             product.cantidad,
-            product.precio,
-            product.cantidad * product.precio,
+            product.precio || 0,
+            product.cantidad * (product.precio || 0),
             `"${order.observaciones.replace(/"/g, '""')}"`,
             order.esFeriado ? 'Sí' : 'No'
           ];
@@ -256,6 +258,45 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
       }));
       
       return filePath;
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Error al exportar pedidos'
+      }));
+      
+      throw error;
+    }
+  };
+
+  // Exportar pedidos a Excel
+  const exportOrdersToExcel = async (): Promise<string | boolean> => {
+    if (!user || state.orders.length === 0) {
+      throw new Error('No hay pedidos para exportar');
+    }
+    
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      // Obtener todos los pedidos con sus detalles
+      const ordersWithDetails: OrderWithDetails[] = [];
+      
+      for (const order of state.orders) {
+        const details = await getOrderWithDetails(order.id);
+        if (details) {
+          ordersWithDetails.push(details);
+        }
+      }
+      
+      // Exportar a Excel usando la utilidad
+      const result = await exportToExcel(ordersWithDetails);
+      
+      setState(prev => ({
+        ...prev,
+        loading: false
+      }));
+      
+      return result;
     } catch (error) {
       setState(prev => ({
         ...prev,
@@ -347,6 +388,7 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     updateExistingOrder,
     removeOrder,
     exportOrdersToCSV,
+    exportOrdersToExcel,
     selectProduct,
     resetSelectedProducts,
     loadAvailableProducts,

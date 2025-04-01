@@ -4,7 +4,6 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import RNHTMLtoPDF from 'react-native-html-to-pdf';
 
 /**
  * Genera un HTML básico para representar un pedido
@@ -18,6 +17,8 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
     <tr>
       <td style="padding: 8px; border: 1px solid #ddd;">${product.producto}</td>
       <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${product.cantidad}</td>
+      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${product.precio || 0}</td>
+      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(product.precio || 0) * product.cantidad}</td>
     </tr>
   `).join('');
   
@@ -36,6 +37,10 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
         .info-card { background-color: #f9fafb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .info-row { display: flex; margin-bottom: 8px; }
         .info-label { font-weight: bold; width: 140px; }
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
       </style>
     </head>
     <body>
@@ -56,6 +61,10 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
           <div class="info-label">Es Feriado:</div>
           <div>${order.esFeriado ? 'Sí' : 'No'}</div>
         </div>
+        <div class="info-row">
+          <div class="info-label">Estado:</div>
+          <div>${order.estado}</div>
+        </div>
         ${order.observaciones ? `
         <div class="info-row" style="display: block; margin-top: 10px;">
           <div class="info-label">Observaciones:</div>
@@ -72,6 +81,8 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
           <tr>
             <th>Producto</th>
             <th>Cantidad</th>
+            <th>Precio</th>
+            <th>Subtotal</th>
           </tr>
         </thead>
         <tbody>
@@ -103,14 +114,18 @@ const exportOrderToPdfWeb = async (order: OrderWithDetails): Promise<boolean> =>
       
       // Abrir ventana de impresión si tenemos contentWindow
       if (iframe.contentWindow) {
-        iframe.contentWindow.print();
+        iframe.contentWindow.onload = function() {
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+          }, 250);
+        };
       }
     }
     
     // Limpiar después de un tiempo
     setTimeout(() => {
       document.body.removeChild(iframe);
-    }, 1000);
+    }, 2000);
     
     return true;
   } catch (error) {
@@ -155,29 +170,28 @@ const exportOrderToPdfMobile = async (order: OrderWithDetails): Promise<boolean>
     
     const htmlContent = generateOrderHtml(order);
     
-    // Usar react-native-html-to-pdf
-    const options = {
-      html: htmlContent,
-      fileName: `pedido_${order.id.substring(0, 8)}`,
-      directory: 'Pedidos',
-    };
-    
-    // Generar el PDF
-    const file = await RNHTMLtoPDF.convert(options);
-    
-    if (!file || !file.filePath) {
-      console.error('Error al generar el PDF: No se generó el archivo');
-      return false;
-    }
-    
-    // Compartir el archivo
-    await Sharing.shareAsync(file.filePath, {
-      mimeType: 'application/pdf',
-      dialogTitle: `Pedido #${order.id.substring(0, 8)}`,
-      UTI: 'com.adobe.pdf'  // para iOS
+    // Para dispositivos móviles, convertir HTML a PDF y guardar como archivo temporal
+    const tempHtmlFile = `${FileSystem.cacheDirectory}tempOrder_${order.id.substring(0, 8)}.html`;
+    await FileSystem.writeAsStringAsync(tempHtmlFile, htmlContent, {
+      encoding: FileSystem.EncodingType.UTF8
     });
     
-    return true;
+    const pdfFile = `${FileSystem.cacheDirectory}pedido_${order.id.substring(0, 8)}.pdf`;
+    
+    // Intentamos mostrar un visor de HTML que permita guardar como PDF
+    try {
+      // Intentar compartir directamente el archivo HTML
+      await Sharing.shareAsync(tempHtmlFile, {
+        mimeType: 'text/html',
+        dialogTitle: `Pedido #${order.id.substring(0, 8)}`,
+        UTI: 'public.html'
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error al compartir HTML:', error);
+      return false;
+    }
   } catch (error) {
     console.error('Error al exportar a PDF en móvil:', error);
     return false;

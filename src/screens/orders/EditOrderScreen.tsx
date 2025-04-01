@@ -148,7 +148,7 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // Calcular total del pedido
   const totalAmount = selectedProducts
-    .reduce((sum, product) => sum + (product.precio * product.cantidad), 0);
+    .reduce((sum, product) => sum + ((product.precio || 0) * product.cantidad), 0);
     
   const totalItems = selectedProducts
     .reduce((sum, product) => sum + product.cantidad, 0);
