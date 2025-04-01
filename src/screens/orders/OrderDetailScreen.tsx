@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Image, Platform, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -7,7 +7,8 @@ import { es } from 'date-fns/locale';
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
 import { OrderWithDetails } from '../../types';
-import { exportOrderToCsv } from '../../utils/exportCsv';
+import { exportOrderToPdf } from '../../utils/exportPdf';
+import { exportOrderToExcel } from '../../utils/exportExcel';
 
 // URL de imagen placeholder para productos sin imagen
 const placeholderImage = 'https://via.placeholder.com/150/CCCCCC/888888?text=Sin+Imagen';
@@ -17,6 +18,8 @@ type Props = OrdersScreenProps<'OrderDetail'>;
 const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId } = route.params;
   const { getOrderDetails, canEditOrder, removeOrder, selectedOrder, loading } = useOrders();
+  const [exportLoading, setExportLoading] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
 
   useEffect(() => {
     loadOrderDetails();
@@ -62,29 +65,64 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  const handleExportCSV = () => {
+  const handleExportPDF = async () => {
     if (!selectedOrder) {
       Alert.alert('Error', 'No hay datos de pedido para exportar');
       return;
     }
     
-    if (Platform.OS !== 'web') {
-      Alert.alert('Exportación CSV', 'La exportación a CSV solo está disponible en la versión web.');
+    setExportLoading(true);
+    setShowExportOptions(false);
+    
+    try {
+      const result = await exportOrderToPdf(selectedOrder);
+      
+      if (result) {
+        if (Platform.OS === 'web') {
+          Alert.alert('Éxito', 'El pedido ha sido exportado a PDF correctamente');
+        }
+        // En móviles no es necesario mostrar una alerta porque el sistema ya muestra un diálogo de compartir
+      } else {
+        Alert.alert('Error', 'No se pudo exportar el pedido a PDF');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un error al exportar a PDF');
+      console.error(error);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (!selectedOrder) {
+      Alert.alert('Error', 'No hay datos de pedido para exportar');
       return;
     }
     
+    setExportLoading(true);
+    setShowExportOptions(false);
+    
     try {
-      const success = exportOrderToCsv(selectedOrder);
+      const result = await exportOrderToExcel(selectedOrder);
       
-      if (success) {
-        Alert.alert('Éxito', 'El pedido ha sido exportado a CSV correctamente');
+      if (result) {
+        if (Platform.OS === 'web') {
+          Alert.alert('Éxito', 'El pedido ha sido exportado a Excel correctamente');
+        }
+        // En móviles no es necesario mostrar una alerta porque el sistema ya muestra un diálogo de compartir
       } else {
-        Alert.alert('Error', 'No se pudo exportar el pedido a CSV');
+        Alert.alert('Error', 'No se pudo exportar el pedido a Excel');
       }
     } catch (error) {
-      Alert.alert('Error', 'Ocurrió un error al exportar a CSV');
+      Alert.alert('Error', 'Ocurrió un error al exportar a Excel');
       console.error(error);
+    } finally {
+      setExportLoading(false);
     }
+  };
+
+  const toggleExportOptions = () => {
+    setShowExportOptions(!showExportOptions);
   };
 
   if (loading || !selectedOrder) {
@@ -110,14 +148,16 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       </View>
 
       <View className="p-4">
-        <View className="flex-row justify-between mb-4">
+        <Text className="text-lg font-bold text-gray-800 mb-3">Acciones</Text>
+        
+        <View className="flex-row flex-wrap justify-start mb-4 gap-2">
           {isEditable && (
             <TouchableOpacity 
               className="bg-blue-500 py-2 px-4 rounded-md flex-row items-center"
               onPress={handleEditOrder}
             >
-              <Ionicons name="create-outline" size={20} color="white" className="mr-1" />
-              <Text className="text-white font-bold">Editar</Text>
+              <Ionicons name="create-outline" size={20} color="white" />
+              <Text className="text-white font-bold ml-1">Editar</Text>
             </TouchableOpacity>
           )}
           
@@ -125,20 +165,52 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             className="bg-red-500 py-2 px-4 rounded-md flex-row items-center"
             onPress={handleDeleteOrder}
           >
-            <Ionicons name="trash-outline" size={20} color="white" className="mr-1" />
-            <Text className="text-white font-bold">Eliminar</Text>
+            <Ionicons name="trash-outline" size={20} color="white" />
+            <Text className="text-white font-bold ml-1">Eliminar</Text>
           </TouchableOpacity>
 
-          {Platform.OS === 'web' && (
-            <TouchableOpacity 
-              className="bg-green-500 py-2 px-4 rounded-md flex-row items-center"
-              onPress={handleExportCSV}
-            >
-              <Ionicons name="download-outline" size={20} color="white" className="mr-1" />
-              <Text className="text-white font-bold">Exportar CSV</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            className="bg-green-600 py-2 px-4 rounded-md flex-row items-center"
+            onPress={toggleExportOptions}
+            disabled={exportLoading}
+          >
+            {exportLoading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={20} color="white" />
+                <Text className="text-white font-bold ml-1">Exportar</Text>
+                <Ionicons 
+                  name={showExportOptions ? "chevron-up-outline" : "chevron-down-outline"} 
+                  size={16} 
+                  color="white" 
+                  style={{ marginLeft: 4 }}
+                />
+              </>
+            )}
+          </TouchableOpacity>
         </View>
+
+        {/* Opciones de exportación */}
+        {showExportOptions && (
+          <View className="bg-white rounded-lg shadow-sm p-2 mb-4">
+            <TouchableOpacity 
+              className="py-2 px-3 flex-row items-center border-b border-gray-100"
+              onPress={handleExportExcel}
+            >
+              <Ionicons name="document-outline" size={20} color="#16a34a" />
+              <Text className="ml-2 text-gray-800">Exportar a Excel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              className="py-2 px-3 flex-row items-center"
+              onPress={handleExportPDF}
+            >
+              <Ionicons name="document-text-outline" size={20} color="#e11d48" />
+              <Text className="ml-2 text-gray-800">Exportar a PDF</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
           <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>

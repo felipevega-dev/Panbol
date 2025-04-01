@@ -1,35 +1,46 @@
 import { Platform } from 'react-native';
-import { OrderWithDetails, ProductWithQuantity } from '../types';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { OrderWithDetails } from '../types';
 
 /**
- * Genera un string en formato CSV a partir de un pedido
+ * Genera un string en formato CSV con formato correcto para Excel
  */
 export const generateOrderCsv = (order: OrderWithDetails): string => {
-  const headers = 'ID Producto,Producto,Categoria,Cantidad\n';
+  // Cabeceras
+  const headers = ['Fecha de Pedido', 'Fecha de Entrega', 'Es Feriado', 'Producto', 'Cantidad'].join(',');
   
-  // Mapear productos a filas CSV
+  // Formatear fechas
+  const orderDate = format(new Date(order.fechaPedido), 'dd/MM/yyyy', { locale: es });
+  const deliveryDate = format(new Date(order.fechaEntrega), 'dd/MM/yyyy', { locale: es });
+  const isHoliday = order.esFeriado ? 'Sí' : 'No';
+  
+  // Crear filas para cada producto
   const rows = order.productos.map(product => {
-    return `${product.productoID},"${product.producto}","${product.categoria}",${product.cantidad}`;
+    return [
+      orderDate,
+      deliveryDate,
+      isHoliday,
+      product.producto,
+      product.cantidad
+    ].join(',');
   }).join('\n');
   
-  // Añadir información del pedido
-  const orderInfo = `\n\nFecha de Pedido,${new Date(order.fechaPedido).toLocaleDateString()}\n` +
-    `Fecha de Entrega,${new Date(order.fechaEntrega).toLocaleDateString()}\n` +
-    `Observaciones,"${order.observaciones || ''}"\n` +
-    `Estado,${order.estado}\n`;
+  // Si no hay productos, crear al menos una fila con la información básica
+  if (order.productos.length === 0) {
+    const emptyRow = [orderDate, deliveryDate, isHoliday, '', ''].join(',');
+    return headers + '\n' + emptyRow;
+  }
   
-  return headers + rows + orderInfo;
+  return headers + '\n' + rows;
 };
 
 /**
- * Exporta un pedido a un archivo CSV (solo funciona en web)
+ * Exporta un pedido a un archivo CSV para web
  */
-export const exportOrderToCsv = (order: OrderWithDetails) => {
-  if (Platform.OS !== 'web') {
-    console.warn('La exportación a CSV solo está disponible en web');
-    return false;
-  }
-  
+const exportOrderToCsvWeb = (order: OrderWithDetails): boolean => {
   try {
     const csvContent = generateOrderCsv(order);
     
@@ -54,7 +65,52 @@ export const exportOrderToCsv = (order: OrderWithDetails) => {
     
     return true;
   } catch (error) {
-    console.error('Error al exportar a CSV:', error);
+    console.error('Error al exportar a CSV en web:', error);
     return false;
+  }
+};
+
+/**
+ * Exporta un pedido a un archivo CSV para dispositivos móviles
+ */
+const exportOrderToCsvMobile = async (order: OrderWithDetails): Promise<boolean> => {
+  try {
+    const csvContent = generateOrderCsv(order);
+    
+    // Verificar si se puede compartir
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      console.warn('La exportación a CSV no está disponible en este dispositivo');
+      return false;
+    }
+    
+    // Crear archivo temporal
+    const fileUri = `${FileSystem.cacheDirectory}pedido_${order.id.substring(0, 8)}.csv`;
+    await FileSystem.writeAsStringAsync(fileUri, csvContent, {
+      encoding: FileSystem.EncodingType.UTF8
+    });
+    
+    // Compartir el archivo
+    await Sharing.shareAsync(fileUri, {
+      mimeType: 'text/csv',
+      dialogTitle: `Pedido #${order.id.substring(0, 8)}`,
+      UTI: 'public.comma-separated-values-text'  // para iOS
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error al exportar a CSV en móvil:', error);
+    return false;
+  }
+};
+
+/**
+ * Exporta un pedido a un archivo CSV (compatible con web y móvil)
+ */
+export const exportOrderToCsv = (order: OrderWithDetails): boolean | Promise<boolean> => {
+  if (Platform.OS === 'web') {
+    return exportOrderToCsvWeb(order);
+  } else {
+    return exportOrderToCsvMobile(order);
   }
 };
