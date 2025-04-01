@@ -43,6 +43,7 @@ const ProductsAdminScreen: React.FC = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedProductIdForEdit, setSelectedProductIdForEdit] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const navigation = useNavigation();
 
   // Cargar productos al inicio
@@ -177,30 +178,66 @@ const ProductsAdminScreen: React.FC = () => {
 
   // Eliminar producto
   const handleDelete = async (productId: string) => {
-    Alert.alert(
-      'Confirmar eliminación',
-      '¿Estás seguro de que deseas eliminar este producto?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Eliminar', 
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await deleteProduct(productId);
-              setLoading(false);
-              Alert.alert('Éxito', 'Producto eliminado correctamente');
-              loadProducts();
-            } catch (error) {
-              setLoading(false);
-              Alert.alert('Error', 'No se pudo eliminar el producto');
-              console.error('Error eliminando producto:', error);
-            }
-          },
-          style: 'destructive'
-        }
-      ]
-    );
+    if (Platform.OS !== 'web') {
+      // En móvil, usamos Alert nativo
+      Alert.alert(
+        'Confirmar eliminación',
+        '¿Estás seguro de que deseas eliminar este producto?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Eliminar', 
+            onPress: async () => {
+              try {
+                setLoading(true);
+                await deleteProduct(productId);
+                setLoading(false);
+                Alert.alert('Éxito', 'Producto eliminado correctamente');
+                loadProducts();
+              } catch (error) {
+                setLoading(false);
+                Alert.alert('Error', 'No se pudo eliminar el producto');
+                console.error('Error eliminando producto:', error);
+              }
+            },
+            style: 'destructive'
+          }
+        ]
+      );
+    } else {
+      // En web, usamos nuestro propio diálogo de confirmación
+      setConfirmDeleteId(productId);
+    }
+  };
+
+  // Confirmar eliminación (para web)
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    
+    try {
+      setLoading(true);
+      await deleteProduct(confirmDeleteId);
+      setLoading(false);
+      setConfirmDeleteId(null);
+      
+      // Mostrar mensaje (puede ser a través de un estado)
+      if (Platform.OS === 'web') {
+        alert('Producto eliminado correctamente');
+      } else {
+        Alert.alert('Éxito', 'Producto eliminado correctamente');
+      }
+      
+      loadProducts();
+    } catch (error) {
+      setLoading(false);
+      console.error('Error eliminando producto:', error);
+      
+      if (Platform.OS === 'web') {
+        alert('No se pudo eliminar el producto');
+      } else {
+        Alert.alert('Error', 'No se pudo eliminar el producto');
+      }
+    }
   };
 
   // Manejar la importación de productos
@@ -339,6 +376,49 @@ const ProductsAdminScreen: React.FC = () => {
     );
   };
   
+  // Renderizar modal de confirmación de eliminación para web
+  const renderDeleteConfirmModal = () => {
+    if (!confirmDeleteId) return null;
+    const product = products.find(p => p.id === confirmDeleteId);
+    if (!product) return null;
+    
+    return (
+      <Modal
+        transparent={true}
+        visible={!!confirmDeleteId}
+        animationType="fade"
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-lg shadow-lg p-4 w-11/12 max-w-md m-4">
+            <View className="items-center mb-4">
+              <Ionicons name="warning-outline" size={48} color="#f59e0b" />
+              <Text className="text-xl font-bold mt-2 text-center">¿Eliminar este producto?</Text>
+              <Text className="text-gray-600 text-center mt-1">
+                Estás a punto de eliminar "{product.producto}". Esta acción no se puede deshacer.
+              </Text>
+            </View>
+            
+            <View className="flex-row justify-center space-x-3 mt-2">
+              <TouchableOpacity
+                onPress={() => setConfirmDeleteId(null)}
+                className="px-5 py-2 bg-gray-200 rounded-lg"
+              >
+                <Text className="text-gray-800 font-medium">Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={confirmDelete}
+                className="px-5 py-2 bg-red-500 rounded-lg"
+              >
+                <Text className="text-white font-medium">Eliminar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+  
   // Renderizar formulario de producto
   const renderForm = () => (
     <View className="bg-white p-4 rounded-lg shadow-md mb-4">
@@ -469,54 +549,100 @@ const ProductsAdminScreen: React.FC = () => {
         {category}
       </Text>
       
-      {items.map(item => (
-        <View key={item.id} className="flex-row items-center justify-between bg-white p-3 mb-2 rounded-lg shadow-sm">
-          <View className="flex-row items-center flex-1">
-            <Image 
-              source={{ uri: item.imagen || placeholderImage }} 
-              className="w-16 h-16 rounded-lg mr-3"
-              defaultSource={{ uri: placeholderImage }}
-            />
-            
-            <View className="flex-1">
-              <Text className="font-bold text-lg">{item.producto}</Text>
+      {Platform.OS === 'web' ? (
+        // Vista web - Lista horizontal
+        items.map(item => (
+          <View key={item.id} className="flex-row items-center justify-between bg-white p-3 mb-2 rounded-lg shadow-sm">
+            <View className="flex-row items-center flex-1">
+              <Image 
+                source={{ uri: item.imagen || placeholderImage }} 
+                className="w-16 h-16 rounded-lg mr-3"
+                defaultSource={{ uri: placeholderImage }}
+              />
+              
+              <View className="flex-1">
+                <Text className="font-bold text-lg">{item.producto}</Text>
+              </View>
             </View>
-          </View>
-          
-          <View className="flex-row">
-            <TouchableOpacity
-              onPress={() => {
-                setEditingProduct(item);
-                setFormValues({
-                  productoID: item.productoID,
-                  categoria: item.categoria,
-                  producto: item.producto,
-                  imagen: item.imagen
-                });
-                setImageUrl(item.imagen || placeholderImage);
-                
-                // Hacer scroll al formulario si estamos en móvil
-                if (Platform.OS !== 'web') {
-                  setShowForm(true);
-                } else {
+            
+            <View className="flex-row">
+              <TouchableOpacity
+                onPress={() => {
+                  setEditingProduct(item);
+                  setFormValues({
+                    productoID: item.productoID,
+                    categoria: item.categoria,
+                    producto: item.producto,
+                    imagen: item.imagen
+                  });
+                  setImageUrl(item.imagen || placeholderImage);
+                  
                   // En web, mostrar formulario junto al producto (modal)
                   setSelectedProductIdForEdit(item.id);
-                }
-              }}
-              className="px-3 py-1 bg-blue-100 rounded mr-2"
-            >
-              <Text className="text-blue-800">Editar</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={() => handleDelete(item.id)}
-              className="px-3 py-1 bg-red-100 rounded"
-            >
-              <Text className="text-red-800">Eliminar</Text>
-            </TouchableOpacity>
+                }}
+                className="px-3 py-1 bg-blue-100 rounded mr-2"
+              >
+                <Text className="text-blue-800">Editar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                onPress={() => handleDelete(item.id)}
+                className="px-3 py-1 bg-red-100 rounded"
+              >
+                <Text className="text-red-800">Eliminar</Text>
+              </TouchableOpacity>
+            </View>
           </View>
+        ))
+      ) : (
+        // Vista móvil - Tarjetas con diseño mejorado
+        <View>
+          {items.map(item => (
+            <View key={item.id} className="bg-white rounded-xl shadow-md overflow-hidden mb-3">
+              <View className="flex-row">
+                <Image 
+                  source={{ uri: item.imagen || placeholderImage }} 
+                  className="w-24 h-24"
+                  defaultSource={{ uri: placeholderImage }}
+                />
+                
+                <View className="flex-1 p-3 justify-between">
+                  <View>
+                    <Text className="font-bold text-lg text-gray-800">{item.producto}</Text>
+                    <Text className="text-xs text-gray-500">ID: {item.productoID}</Text>
+                  </View>
+                  
+                  <View className="flex-row justify-end mt-2">
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditingProduct(item);
+                        setFormValues({
+                          productoID: item.productoID,
+                          categoria: item.categoria,
+                          producto: item.producto,
+                          imagen: item.imagen
+                        });
+                        setImageUrl(item.imagen || placeholderImage);
+                        setShowForm(true);
+                      }}
+                      className="bg-blue-500 rounded-full w-10 h-10 justify-center items-center mr-2"
+                    >
+                      <Ionicons name="pencil" size={18} color="white" />
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      onPress={() => handleDelete(item.id)}
+                      className="bg-red-500 rounded-full w-10 h-10 justify-center items-center"
+                    >
+                      <Ionicons name="trash-outline" size={18} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
-      ))}
+      )}
     </View>
   );
 
@@ -533,9 +659,11 @@ const ProductsAdminScreen: React.FC = () => {
         /> : undefined
       }
     >
-      <View className="p-4">
+      <View className={Platform.OS === 'web' ? "p-4" : "p-3"}>
         <View className="flex-row justify-between items-center mb-4">
-          <Text className="text-2xl font-bold text-gray-800">Administrar Productos</Text>
+          <Text className={`${Platform.OS === 'web' ? 'text-2xl' : 'text-xl'} font-bold text-gray-800`}>
+            Administrar Productos
+          </Text>
           
           {!showForm && (
             <TouchableOpacity 
@@ -545,9 +673,15 @@ const ProductsAdminScreen: React.FC = () => {
                 setFormValues(initialProduct);
                 setImageUrl(placeholderImage);
               }}
-              className="px-4 py-2 bg-green-500 rounded"
+              className={Platform.OS === 'web' 
+                ? "px-4 py-2 bg-green-500 rounded" 
+                : "px-3 py-2 bg-green-500 rounded-full flex-row items-center"
+              }
             >
-              <Text className="text-white">Nuevo Producto</Text>
+              {Platform.OS !== 'web' && <Ionicons name="add" size={18} color="white" style={{ marginRight: 4 }} />}
+              <Text className="text-white font-medium">
+                {Platform.OS === 'web' ? 'Nuevo Producto' : 'Nuevo'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -560,6 +694,7 @@ const ProductsAdminScreen: React.FC = () => {
         {showForm && renderForm()}
         
         {selectedProductIdForEdit && renderFormModal(selectedProductIdForEdit)}
+        {renderDeleteConfirmModal()}
         
         {loading ? (
           <ActivityIndicator size="large" color="#0000ff" className="mt-4" />
