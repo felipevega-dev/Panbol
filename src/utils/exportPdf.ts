@@ -199,12 +199,17 @@ const exportOrderToPdfMobile = async (order: OrderWithDetails): Promise<boolean>
 };
 
 /**
- * Exporta un pedido a un archivo PDF (compatible con web y móvil)
+ * Exporta un pedido como PDF
  */
-export const exportOrderToPdf = (order: OrderWithDetails): Promise<boolean> => {
-  if (Platform.OS === 'web') {
-    return exportOrderToPdfWeb(order);
-  } else {
-    return exportOrderToPdfMobile(order);
+export const exportOrderToPdf = async (order: OrderWithDetails): Promise<boolean> => {
+  try {
+    if (Platform.OS === 'web') {
+      return await exportOrderToPdfWeb(order);
+    } else {
+      return await exportOrderToPdfMobile(order);
+    }
+  } catch (error) {
+    console.error('Error al exportar a PDF:', error);
+    throw error;
   }
 };

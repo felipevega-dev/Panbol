@@ -14,21 +14,14 @@ export const exportOrdersToExcel = async (orders: OrderWithDetails[]): Promise<s
     // Crear un nuevo libro
     const wb = XLSX.utils.book_new();
     
-    // Datos para la hoja principal con todos los pedidos
-    const ordersData = orders.flatMap(order => {
-      return order.productos.map(product => [
-        order.id,
-        format(new Date(order.fechaPedido), 'dd/MM/yyyy', { locale: es }),
-        format(new Date(order.fechaEntrega), 'dd/MM/yyyy', { locale: es }),
-        order.estado,
-        order.esFeriado ? 'Sí' : 'No',
-        product.producto,
-        product.cantidad,
-        product.precio || 0,
-        (product.precio || 0) * product.cantidad,
-        order.observaciones || ''
-      ]);
-    });
+    // Datos para la hoja principal con solo las columnas esenciales
+    const ordersData = orders.map(order => [
+      order.id,
+      format(new Date(order.fechaPedido), 'dd/MM/yyyy', { locale: es }),
+      format(new Date(order.fechaEntrega), 'dd/MM/yyyy', { locale: es }),
+      order.estado,
+      order.esFeriado ? 'Sí' : 'No',
+    ]);
     
     // Añadir cabeceras
     const headers = [
@@ -36,12 +29,7 @@ export const exportOrdersToExcel = async (orders: OrderWithDetails[]): Promise<s
       'Fecha Pedido', 
       'Fecha Entrega', 
       'Estado', 
-      'Es Feriado', 
-      'Producto', 
-      'Cantidad', 
-      'Precio', 
-      'Subtotal', 
-      'Observaciones'
+      'Es Feriado'
     ];
     
     const mainSheetData = [
@@ -54,56 +42,17 @@ export const exportOrdersToExcel = async (orders: OrderWithDetails[]): Promise<s
     
     // Ajustar ancho de columnas
     const columnWidths = [
-      { wch: 20 }, // ID
+      { wch: 25 }, // ID
       { wch: 15 }, // Fecha Pedido
       { wch: 15 }, // Fecha Entrega
-      { wch: 10 }, // Estado
-      { wch: 10 }, // Es Feriado
-      { wch: 25 }, // Producto
-      { wch: 10 }, // Cantidad
-      { wch: 10 }, // Precio
-      { wch: 10 }, // Subtotal
-      { wch: 30 }  // Observaciones
+      { wch: 15 }, // Estado
+      { wch: 12 }  // Es Feriado
     ];
     
     mainSheet['!cols'] = columnWidths;
     
     // Añadir la hoja al libro
-    XLSX.utils.book_append_sheet(wb, mainSheet, 'Todos los Pedidos');
-    
-    // También crear una hoja para cada pedido
-    orders.forEach(order => {
-      const orderProducts = order.productos.map(product => [
-        product.producto,
-        product.cantidad,
-        product.precio || 0,
-        (product.precio || 0) * product.cantidad
-      ]);
-      
-      const orderSheet = XLSX.utils.aoa_to_sheet([
-        ['Detalles del Pedido'],
-        ['ID:', order.id],
-        ['Fecha Pedido:', format(new Date(order.fechaPedido), 'dd/MM/yyyy', { locale: es })],
-        ['Fecha Entrega:', format(new Date(order.fechaEntrega), 'dd/MM/yyyy', { locale: es })],
-        ['Estado:', order.estado],
-        ['Es Feriado:', order.esFeriado ? 'Sí' : 'No'],
-        ['Observaciones:', order.observaciones || ''],
-        [''],
-        ['Productos'],
-        ['Producto', 'Cantidad', 'Precio', 'Subtotal'],
-        ...orderProducts
-      ]);
-      
-      // Ajustar ancho de columnas para cada hoja de pedido
-      orderSheet['!cols'] = [
-        { wch: 25 }, // Producto
-        { wch: 10 }, // Cantidad
-        { wch: 10 }, // Precio
-        { wch: 10 }  // Subtotal
-      ];
-      
-      XLSX.utils.book_append_sheet(wb, orderSheet, `Pedido-${order.id.substring(0, 6)}`);
-    });
+    XLSX.utils.book_append_sheet(wb, mainSheet, 'Pedidos');
     
     // Generar el archivo
     const fileName = `pedidos_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`;
@@ -121,12 +70,20 @@ export const exportOrdersToExcel = async (orders: OrderWithDetails[]): Promise<s
         encoding: FileSystem.EncodingType.Base64
       });
       
+      // Compartir el archivo
       await Sharing.shareAsync(fileUri, {
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         dialogTitle: 'Exportar Pedidos'
       });
       
-      return fileUri;
+      // Limpiar el archivo temporal después de compartir
+      try {
+        await FileSystem.deleteAsync(fileUri, { idempotent: true });
+      } catch (cleanupError) {
+        console.warn('No se pudo eliminar el archivo temporal:', cleanupError);
+      }
+      
+      return true;
     }
   } catch (error) {
     console.error('Error al exportar a Excel:', error);

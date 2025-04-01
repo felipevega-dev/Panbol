@@ -9,6 +9,7 @@ import {
   getRedirectResult,
   User as FirebaseUser
 } from 'firebase/auth';
+import { Platform } from 'react-native';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { User } from '../types';
@@ -100,16 +101,23 @@ export const loginWithGoogle = async (): Promise<User> => {
   try {
     const provider = new GoogleAuthProvider();
     
-    // Usar diferentes métodos según la plataforma
     let userCredential;
     
-    if (typeof window !== 'undefined' && window.navigator.userAgent.includes('Mobile')) {
-      // En dispositivos móviles en web, usar redirect (más compatible)
-      await signInWithRedirect(auth, provider);
-      userCredential = await getRedirectResult(auth);
+    // Verificar la plataforma y usar el método apropiado
+    if (Platform.OS === 'web') {
+      // En web usamos signInWithPopup
+      try {
+        userCredential = await signInWithPopup(auth, provider);
+      } catch (popupError) {
+        console.warn('Error con popup, intentando con redirect:', popupError);
+        // Si falla el popup, intentar con redirect
+        await signInWithRedirect(auth, provider);
+        userCredential = await getRedirectResult(auth);
+      }
     } else {
-      // En desktop, usar popup
-      userCredential = await signInWithPopup(auth, provider);
+      // En móvil, Firebase Auth no soporta directamente signInWithPopup
+      // Puedes usar una biblioteca como expo-auth-session o react-native-google-signin
+      throw new Error('Inicio de sesión con Google no configurado para dispositivos móviles. Por favor, usa inicio de sesión con email/contraseña.');
     }
     
     if (!userCredential) {

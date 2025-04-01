@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
 import { OrderWithDetails } from '../../types';
-import { exportOrderToPdf } from '../../utils/exportPdf';
+import { printOrderToPdf } from '../../utils/exportPrint';
 import { exportOrderToExcel } from '../../utils/exportExcel';
 
 // URL de imagen placeholder para productos sin imagen
@@ -75,13 +75,10 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setShowExportOptions(false);
     
     try {
-      const result = await exportOrderToPdf(selectedOrder);
+      const result = await printOrderToPdf(selectedOrder);
       
       if (result) {
-        if (Platform.OS === 'web') {
-          Alert.alert('Éxito', 'El pedido ha sido exportado a PDF correctamente');
-        }
-        // En móviles no es necesario mostrar una alerta porque el sistema ya muestra un diálogo de compartir
+        Alert.alert('Éxito', 'El pedido ha sido exportado a PDF correctamente');
       } else {
         Alert.alert('Error', 'No se pudo exportar el pedido a PDF');
       }
