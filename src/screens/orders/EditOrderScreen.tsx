@@ -163,7 +163,16 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
         selectedProducts
       );
 
-      // Eliminar la lógica duplicada y siempre navegar a OrdersList
+      // En web, navegamos directamente sin esperar el Alert
+      if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'OrdersList' }],
+        });
+        return;
+      }
+      
+      // En mobile, usamos Alert con callback
       Alert.alert(
         'Pedido Actualizado',
         'Tu pedido ha sido actualizado correctamente.',

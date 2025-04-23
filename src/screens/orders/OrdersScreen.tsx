@@ -131,9 +131,32 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const formatDateTime = (dateString: string | Date) => {
+    try {
+      const date = dateString instanceof Date ? dateString : new Date(dateString);
+      return format(date, 'dd/MM/yy HH:mm', { locale: es });
+    } catch (error) {
+      return String(dateString);
+    }
+  };
+
+  const isUpdated = (order: Order) => {
+    // Si el pedido tiene fechas de creación y actualización
+    if (order.createdAt && order.updatedAt) {
+      const createdDate = new Date(order.createdAt).getTime();
+      const updatedDate = new Date(order.updatedAt).getTime();
+      
+      // Si la diferencia es mayor a 1 minuto (60000 ms), consideramos que fue editado
+      // Esto evita que se muestre "Editado" para pedidos recién creados
+      return (updatedDate - createdDate) > 60000;
+    }
+    return false;
+  };
+
   const renderOrderItem = ({ item }: { item: Order }) => {
     const statusColor = getStatusColor(item.estado);
     const isEditable = canEditOrder(item);
+    const wasEdited = isUpdated(item);
     
     return (
       <TouchableOpacity
@@ -146,6 +169,16 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
               <Text className="text-lg font-bold text-gray-800">Pedido #{item.id.substring(0, 8)}</Text>
               <Text className="text-gray-600">Fecha: {formatDate(item.fechaPedido)}</Text>
               <Text className="text-gray-600">Entrega: {formatDate(item.fechaEntrega)}</Text>
+              
+              {/* Mostrar cuándo fue editado el pedido */}
+              {wasEdited && (
+                <View className="flex-row items-center mt-1">
+                  <Ionicons name="pencil" size={12} color="#6B7280" />
+                  <Text className="text-xs text-gray-500 ml-1">
+                    Editado el {formatDateTime(item.updatedAt)}
+                  </Text>
+                </View>
+              )}
             </View>
             <View className={`px-2 py-1 rounded-full ${statusColor}`}>
               <Text className="text-white font-medium">{item.estado}</Text>
