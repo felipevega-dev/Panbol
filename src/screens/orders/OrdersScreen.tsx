@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -10,12 +10,81 @@ import { Order } from '../../types';
 
 type Props = OrdersScreenProps<'OrdersList'>;
 
+// Opciones de ordenamiento
+enum SortOptions {
+  DATE_DESC = 'Más recientes',
+  DATE_ASC = 'Más antiguos',
+  STATUS = 'Por estado'
+}
+
 const OrdersScreen: React.FC<Props> = ({ navigation }) => {
   const { orders, loading, getOrders, exportOrdersToExcel, canEditOrder } = useOrders();
+  
+  // Estado para ordenamiento y paginación
+  const [sortOption, setSortOption] = useState<SortOptions>(SortOptions.DATE_DESC);
+  const [page, setPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [showSortOptions, setShowSortOptions] = useState(false);
 
   useEffect(() => {
     getOrders();
   }, []);
+
+  // Ordenar pedidos según la opción seleccionada
+  const sortedOrders = React.useMemo(() => {
+    let result = [...orders];
+    
+    switch (sortOption) {
+      case SortOptions.DATE_DESC:
+        return result.sort((a, b) => {
+          const dateA = new Date(a.fechaPedido).getTime();
+          const dateB = new Date(b.fechaPedido).getTime();
+          return dateB - dateA; // Orden descendente
+        });
+      
+      case SortOptions.DATE_ASC:
+        return result.sort((a, b) => {
+          const dateA = new Date(a.fechaPedido).getTime();
+          const dateB = new Date(b.fechaPedido).getTime();
+          return dateA - dateB; // Orden ascendente
+        });
+        
+      case SortOptions.STATUS:
+        return result.sort((a, b) => {
+          // Prioridad: PENDIENTE > ENTREGADO > CANCELADO
+          const getStatusPriority = (status: string) => {
+            switch (status.toUpperCase()) {
+              case 'PENDIENTE': return 0;
+              case 'ENTREGADO': return 1;
+              case 'CANCELADO': return 2;
+              default: return 3;
+            }
+          };
+          
+          return getStatusPriority(a.estado) - getStatusPriority(b.estado);
+        });
+        
+      default:
+        return result;
+    }
+  }, [orders, sortOption]);
+  
+  // Obtener los pedidos para la página actual
+  const paginatedOrders = React.useMemo(() => {
+    const startIndex = (page - 1) * itemsPerPage;
+    return sortedOrders.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedOrders, page, itemsPerPage]);
+  
+  // Cambiar opción de ordenamiento
+  const handleSortChange = (option: SortOptions) => {
+    setSortOption(option);
+    setShowSortOptions(false);
+    // Reset a la primera página cuando cambia el ordenamiento
+    setPage(1);
+  };
+
+  // Calcular número total de páginas
+  const totalPages = Math.ceil(sortedOrders.length / itemsPerPage);
 
   const handleExportExcel = async () => {
     if (loading) return;
@@ -108,29 +177,84 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
+  // Renderizar controles de paginación
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+    
+    return (
+      <View className="flex-row justify-center items-center py-2 bg-white border-t border-gray-200">
+        <TouchableOpacity 
+          className={`p-2 ${page === 1 ? 'opacity-50' : ''}`}
+          disabled={page === 1}
+          onPress={() => setPage(p => Math.max(1, p - 1))}
+        >
+          <Ionicons name="chevron-back" size={20} color="#3b82f6" />
+        </TouchableOpacity>
+        
+        <Text className="px-4 text-gray-700">Página {page} de {totalPages}</Text>
+        
+        <TouchableOpacity 
+          className={`p-2 ${page >= totalPages ? 'opacity-50' : ''}`}
+          disabled={page >= totalPages}
+          onPress={() => setPage(p => Math.min(totalPages, p + 1))}
+        >
+          <Ionicons name="chevron-forward" size={20} color="#3b82f6" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View className="flex-1 bg-gray-100">
       <View className="p-4 flex-row justify-between items-center bg-white border-b border-gray-200">
         <Text className="text-xl font-bold text-gray-800">Mis Pedidos</Text>
-        <TouchableOpacity
-          className="flex-row items-center bg-blue-600 px-3 py-2 rounded-lg"
-          onPress={handleExportExcel}
-          disabled={loading || orders.length === 0}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="white" />
-          ) : (
-            <>
-              <Ionicons name="download-outline" size={18} color="white" />
-              <Text className="ml-1 text-white font-medium">Exportar Excel</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        
+        <View className="flex-row">
+          <TouchableOpacity
+            className="mr-2 flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
+            onPress={() => setShowSortOptions(!showSortOptions)}
+          >
+            <Ionicons name="filter-outline" size={18} color="#4b5563" />
+            <Text className="ml-1 text-gray-700 font-medium">{sortOption}</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            className="flex-row items-center bg-blue-600 px-3 py-2 rounded-lg"
+            onPress={handleExportExcel}
+            disabled={loading || orders.length === 0}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <Ionicons name="download-outline" size={18} color="white" />
+                <Text className="ml-1 text-white font-medium">Exportar Excel</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
+      
+      {/* Opciones de ordenamiento */}
+      {showSortOptions && (
+        <View className="absolute top-16 right-4 z-10 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+          {Object.values(SortOptions).map((option) => (
+            <TouchableOpacity 
+              key={option}
+              className={`px-4 py-3 border-b border-gray-100 ${sortOption === option ? 'bg-blue-50' : ''}`}
+              onPress={() => handleSortChange(option as SortOptions)}
+            >
+              <Text className={`${sortOption === option ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <FlatList
         className="p-4"
-        data={orders}
+        data={paginatedOrders}
         keyExtractor={(item) => item.id}
         renderItem={renderOrderItem}
         refreshControl={
@@ -150,6 +274,7 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </View>
         }
+        ListFooterComponent={renderPagination}
       />
 
       <TouchableOpacity

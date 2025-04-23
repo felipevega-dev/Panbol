@@ -34,6 +34,11 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const buttonScale = useRef(new Animated.Value(1)).current;
   
+  // En web, el panel siempre está visible
+  const [showCartPanel, setShowCartPanel] = useState(Platform.OS === 'android' || Platform.OS === 'ios' ? false : true);
+  // Modal para mostrar productos seleccionados en móvil
+  const [showMobileCartModal, setShowMobileCartModal] = useState(false);
+  
   // Cargar productos al montar el componente
   useEffect(() => {
     loadAvailableProducts();
@@ -51,7 +56,6 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
   // Estado para modal de éxito
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [newOrderId, setNewOrderId] = useState('');
-  const [showCartPanel, setShowCartPanel] = useState(false);
 
   // Manejar refresh
   const onRefresh = async () => {
@@ -290,19 +294,9 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
           )}
 
           {!loading && (
-            <View className={`p-4 ${showCartPanel ? 'mr-[300px]' : ''}`}>
+            <View className="p-4 mr-[300px]">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-lg font-bold text-gray-800">Productos Disponibles</Text>
-                
-                <TouchableOpacity
-                  className="flex-row items-center"
-                  onPress={() => setShowCartPanel(!showCartPanel)}
-                >
-                  <Ionicons name="cart-outline" size={20} color="#3b82f6" />
-                  <Text className="text-blue-500 ml-1 font-medium">
-                    {totalItems > 0 ? `Ver seleccionados (${totalItems})` : "Carrito vacío"}
-                  </Text>
-                </TouchableOpacity>
               </View>
               
               {groupedProducts().map(({ category, items }) => (
@@ -319,7 +313,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           )}
 
-          <View className={`p-4 ${showCartPanel ? 'mr-[300px]' : ''}`}>
+          <View className="p-4 mr-[300px]">
             <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>
             
             <View className="bg-white rounded-lg shadow-sm p-4 mb-3">
@@ -355,62 +349,60 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </ScrollView>
 
-        {/* Panel lateral para productos seleccionados */}
-        {showCartPanel && (
-          <View className="absolute top-0 right-0 bottom-0 w-[300px] bg-white shadow-lg z-10">
-            <View className="p-4 bg-blue-500 flex-row items-center justify-between">
-              <Text className="text-white font-bold text-lg">Productos seleccionados</Text>
-              <TouchableOpacity onPress={() => setShowCartPanel(false)}>
-                <Ionicons name="close" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView className="flex-1 p-2">
-              {availableProducts.filter(p => p.cantidad > 0).length === 0 ? (
-                <View className="p-4 items-center">
-                  <Ionicons name="cart-outline" size={48} color="#9CA3AF" />
-                  <Text className="text-gray-600 text-center mt-2">
-                    No has seleccionado productos
-                  </Text>
-                </View>
-              ) : (
-                availableProducts.filter(p => p.cantidad > 0).map(product => (
-                  <View 
-                    key={product.id} 
-                    className="bg-gray-50 rounded-lg p-2 mb-2 flex-row items-center"
-                  >
-                    <Image 
-                      source={{ uri: product.imagen || placeholderImage }} 
-                      className="w-12 h-12 rounded-md mr-2"
-                      defaultSource={{ uri: placeholderImage }}
-                    />
-                    
-                    <View className="flex-1">
-                      <Text className="text-gray-800 font-medium">{product.producto}</Text>
-                      <Text className="text-gray-600 text-xs">Cantidad: {product.cantidad}</Text>
-                    </View>
-                    
-                    <TouchableOpacity
-                      onPress={() => handleQuantityChange(product.id, 0)}
-                      className="p-1"
-                    >
-                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-            
-            <View className="p-4 border-t border-gray-200">
-              <Text className="text-gray-800 font-bold text-lg">Total: {totalItems} productos</Text>
-            </View>
+        {/* Panel lateral para productos seleccionados - siempre visible en web */}
+        <View className="absolute top-0 right-0 bottom-0 w-[300px] bg-white shadow-lg z-10">
+          <View className="p-4 bg-blue-500 flex-row items-center justify-between">
+            <Text className="text-white font-bold text-lg">Productos seleccionados</Text>
           </View>
-        )}
+          
+          <ScrollView className="flex-1 p-2">
+            {availableProducts.filter(p => p.cantidad > 0).length === 0 ? (
+              <View className="p-4 items-center">
+                <Ionicons name="cart-outline" size={48} color="#9CA3AF" />
+                <Text className="text-gray-600 text-center mt-2">
+                  No has seleccionado productos
+                </Text>
+              </View>
+            ) : (
+              availableProducts.filter(p => p.cantidad > 0).map(product => (
+                <View 
+                  key={product.id} 
+                  className="bg-gray-50 rounded-lg p-2 mb-2 flex-row items-center"
+                >
+                  <Image 
+                    source={{ uri: product.imagen || placeholderImage }} 
+                    className="w-12 h-12 rounded-md mr-2"
+                    defaultSource={{ uri: placeholderImage }}
+                  />
+                  
+                  <View className="flex-1">
+                    <Text className="text-gray-800 font-medium">{product.producto}</Text>
+                    <Text className="text-gray-600 text-xs">Cantidad: {product.cantidad}</Text>
+                  </View>
+                  
+                  <TouchableOpacity
+                    onPress={() => handleQuantityChange(product.id, 0)}
+                    className="p-1"
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </ScrollView>
+          
+          <View className="p-4 border-t border-gray-200">
+            <Text className="text-gray-800 font-bold text-lg">Total: {totalItems} productos</Text>
+          </View>
+        </View>
         
         {/* Botón flotante para confirmar pedido */}
         <Animated.View 
-          className={`absolute bottom-8 right-8 ${showCartPanel ? 'mr-[300px]' : ''}`}
-          style={{ transform: [{ scale: buttonScale }] }}
+          className="absolute bottom-8 right-8 mr-[300px]"
+          style={{ 
+            transform: [{ scale: buttonScale }],
+            width: 'auto'
+          }}
         >
           <TouchableOpacity
             className={`py-3 px-6 rounded-lg ${totalItems > 0 ? 'bg-blue-600' : 'bg-gray-400'} flex-row items-center justify-center shadow-lg`}
@@ -507,7 +499,7 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
             
             <TouchableOpacity
               className="flex-row items-center"
-              onPress={() => setShowCartPanel(!showCartPanel)}
+              onPress={() => setShowMobileCartModal(true)}
             >
               <Ionicons name="cart-outline" size={20} color="#3b82f6" />
               <Text className="text-blue-500 ml-1 font-medium">
@@ -545,65 +537,84 @@ const CreateOrderScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </ScrollView>
       
-      {/* Panel lateral para productos seleccionados */}
-      {Platform.OS !== 'android' && Platform.OS !== 'ios' && showCartPanel && (
-        <View className="absolute top-0 right-0 bottom-0 w-[300px] bg-white shadow-lg z-10">
-          <View className="p-4 bg-blue-500 flex-row items-center justify-between">
-            <Text className="text-white font-bold text-lg">Productos seleccionados</Text>
-            <TouchableOpacity onPress={() => setShowCartPanel(false)}>
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView className="flex-1 p-2">
-            {availableProducts.filter(p => p.cantidad > 0).length === 0 ? (
-              <View className="p-4 items-center">
-                <Ionicons name="cart-outline" size={48} color="#9CA3AF" />
-                <Text className="text-gray-600 text-center mt-2">
-                  No has seleccionado productos
-                </Text>
-              </View>
-            ) : (
-              availableProducts.filter(p => p.cantidad > 0).map(product => (
-                <View 
-                  key={product.id} 
-                  className="bg-gray-50 rounded-lg p-2 mb-2 flex-row items-center"
-                >
-                  <Image 
-                    source={{ uri: product.imagen || placeholderImage }} 
-                    className="w-12 h-12 rounded-md mr-2"
-                    defaultSource={{ uri: placeholderImage }}
-                  />
-                  
-                  <View className="flex-1">
-                    <Text className="text-gray-800 font-medium">{product.producto}</Text>
-                    <Text className="text-gray-600 text-xs">Cantidad: {product.cantidad}</Text>
-                  </View>
-                  
-                  <TouchableOpacity
-                    onPress={() => handleQuantityChange(product.id, 0)}
-                    className="p-1"
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                  </TouchableOpacity>
+      {/* Modal para mostrar productos seleccionados en móvil */}
+      <Modal
+        visible={showMobileCartModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMobileCartModal(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+          <View className="bg-white rounded-lg w-[90%] max-h-[80%] shadow-lg">
+            <View className="p-4 bg-blue-500 flex-row items-center justify-between">
+              <Text className="text-white font-bold text-lg">Productos seleccionados</Text>
+              <TouchableOpacity onPress={() => setShowMobileCartModal(false)}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView className="max-h-[300px] p-2">
+              {availableProducts.filter(p => p.cantidad > 0).length === 0 ? (
+                <View className="p-4 items-center">
+                  <Ionicons name="cart-outline" size={48} color="#9CA3AF" />
+                  <Text className="text-gray-600 text-center mt-2">
+                    No has seleccionado productos
+                  </Text>
                 </View>
-              ))
-            )}
-          </ScrollView>
-          
-          <View className="p-4 border-t border-gray-200">
-            <Text className="text-gray-800 font-bold text-lg">Total: {totalItems} productos</Text>
+              ) : (
+                availableProducts.filter(p => p.cantidad > 0).map(product => (
+                  <View 
+                    key={product.id} 
+                    className="bg-gray-50 rounded-lg p-2 mb-2 flex-row items-center"
+                  >
+                    <Image 
+                      source={{ uri: product.imagen || placeholderImage }} 
+                      className="w-12 h-12 rounded-md mr-2"
+                      defaultSource={{ uri: placeholderImage }}
+                    />
+                    
+                    <View className="flex-1">
+                      <Text className="text-gray-800 font-medium">{product.producto}</Text>
+                      <Text className="text-gray-600 text-xs">Cantidad: {product.cantidad}</Text>
+                    </View>
+                    
+                    <TouchableOpacity
+                      onPress={() => {
+                        handleQuantityChange(product.id, 0);
+                        if (availableProducts.filter(p => p.cantidad > 0).length <= 1) {
+                          setShowMobileCartModal(false);
+                        }
+                      }}
+                      className="p-1"
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            
+            <View className="p-4 border-t border-gray-200">
+              <Text className="text-gray-800 font-bold text-lg mb-4">Total: {totalItems} productos</Text>
+              <TouchableOpacity
+                className="bg-blue-500 py-2 rounded-lg"
+                onPress={() => setShowMobileCartModal(false)}
+              >
+                <Text className="text-white font-bold text-center">Continuar comprando</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      )}
+      </Modal>
       
       {/* Botón flotante para confirmar pedido (adaptativo) */}
       <Animated.View 
-        className={`absolute bottom-8 ${Platform.OS !== 'android' && Platform.OS !== 'ios' ? 'right-8' : 'left-0 right-0 mx-auto'} ${Platform.OS !== 'android' && Platform.OS !== 'ios' && showCartPanel ? 'mr-[300px]' : ''}`}
+        className="absolute bottom-8 left-0 right-0"
         style={{ 
           transform: [{ scale: buttonScale }],
-          width: Platform.OS !== 'android' && Platform.OS !== 'ios' ? 'auto' : '90%',
-          maxWidth: Platform.OS !== 'android' && Platform.OS !== 'ios' ? 'auto' : 400
+          width: '90%',
+          maxWidth: 400,
+          alignSelf: 'center'
         }}
       >
         <TouchableOpacity

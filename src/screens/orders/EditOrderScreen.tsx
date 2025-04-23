@@ -163,20 +163,15 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
         selectedProducts
       );
 
-      // En web mostramos una alerta diferente
-      if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
-        Alert.alert(
-          'Pedido Actualizado',
-          'Tu pedido ha sido actualizado correctamente.',
-          [{ text: 'OK', onPress: () => navigation.navigate('OrdersList') }]
-        );
-      } else {
-        Alert.alert(
-          'Pedido Actualizado',
-          'Tu pedido ha sido actualizado correctamente.',
-          [{ text: 'OK', onPress: () => navigation.navigate('OrdersList') }]
-        );
-      }
+      // Eliminar la lógica duplicada y siempre navegar a OrdersList
+      Alert.alert(
+        'Pedido Actualizado',
+        'Tu pedido ha sido actualizado correctamente.',
+        [{ 
+          text: 'OK', 
+          onPress: () => navigation.navigate('OrdersList')
+        }]
+      );
     } catch (error) {
       Alert.alert(
         'Error',

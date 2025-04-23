@@ -133,7 +133,7 @@ const MainNavigator = () => (
     <MainTab.Screen 
       name="CreateOrder" 
       component={CreateOrderScreen} 
-      options={{ title: 'Crear Pedido' }}
+      options={{ headerShown: false, title: 'Crear Pedido' }}
     />
     <MainTab.Screen 
       name="Profile" 
