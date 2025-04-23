@@ -385,7 +385,15 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      await updateOrder(orderId, { estado: newStatus }, []);
+      // Primero, obtener el pedido actual para preservar sus productos
+      const currentOrder = await getOrderWithDetails(orderId);
+      if (!currentOrder) {
+        throw new Error('No se pudo encontrar el pedido');
+      }
+      
+      // Actualizar solo el estado sin alterar los productos
+      await updateOrder(orderId, { estado: newStatus }, undefined);
+      
       await getOrders(); // Recargar la lista de pedidos
       if (state.selectedOrder && state.selectedOrder.id === orderId) {
         await getOrderDetails(orderId); // Actualizar el pedido seleccionado si coincide

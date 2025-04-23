@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,7 +7,9 @@ import {
   TextInput, 
   Alert,
   Switch,
-  Image
+  Image,
+  Platform,
+  Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
@@ -28,6 +30,9 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // Verificar si el pedido es editable
   const isEditable = canEditOrder(order);
+
+  // Animación para botón de actualizar
+  const buttonScale = useRef(new Animated.Value(1)).current;
 
   // Estado para las fechas y observaciones
   const [deliveryDate, setDeliveryDate] = useState<Date>(
@@ -83,6 +88,18 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
   const removeProduct = (productId: string) => {
     if (!isEditable) return;
     
+    // En web, eliminamos directamente sin mostrar alerta
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
+      setSelectedProducts(prevProducts => 
+        prevProducts.filter(product => product.id !== productId)
+      );
+      
+      // Animar botón al eliminar
+      animateButton();
+      return;
+    }
+    
+    // En móvil, mostramos alerta de confirmación
     Alert.alert(
       'Confirmar',
       '¿Estás seguro que deseas eliminar este producto del pedido?',
@@ -94,11 +111,29 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
             setSelectedProducts(prevProducts => 
               prevProducts.filter(product => product.id !== productId)
             );
+            // Animar botón al eliminar
+            animateButton();
           },
           style: 'destructive'
         }
       ]
     );
+  };
+
+  // Animar botón
+  const animateButton = () => {
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
   };
 
   // Actualizar pedido
@@ -128,16 +163,20 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
         selectedProducts
       );
 
-      Alert.alert(
-        'Pedido Actualizado',
-        'Tu pedido ha sido actualizado correctamente.',
-        [
-          { 
-            text: 'Ver Detalles', 
-            onPress: () => navigation.navigate('OrderDetail', { orderId: order.id })
-          }
-        ]
-      );
+      // En web mostramos una alerta diferente
+      if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
+        Alert.alert(
+          'Pedido Actualizado',
+          'Tu pedido ha sido actualizado correctamente.',
+          [{ text: 'OK', onPress: () => navigation.navigate('OrdersList') }]
+        );
+      } else {
+        Alert.alert(
+          'Pedido Actualizado',
+          'Tu pedido ha sido actualizado correctamente.',
+          [{ text: 'OK', onPress: () => navigation.navigate('OrdersList') }]
+        );
+      }
     } catch (error) {
       Alert.alert(
         'Error',
@@ -205,7 +244,7 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
               <TouchableOpacity
                 onPress={() => removeProduct(product.id)}
                 disabled={!isEditable}
-                className={`ml-2 p-2 ${!isEditable ? 'opacity-50' : ''}`}
+                className={`p-2 ml-2 ${!isEditable ? 'opacity-50' : ''}`}
               >
                 <Ionicons name="trash-outline" size={20} color="#EF4444" />
               </TouchableOpacity>
@@ -268,15 +307,17 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
           </View> */}
         </View>
         
-        <TouchableOpacity
-          onPress={handleUpdateOrder}
-          disabled={!isEditable || loading}
-          className={`py-3 rounded-lg ${isEditable ? 'bg-blue-500' : 'bg-gray-400'}`}
-        >
-          <Text className="text-white font-bold text-center">
-            {loading ? 'Actualizando...' : 'Actualizar Pedido'}
-          </Text>
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+          <TouchableOpacity
+            onPress={handleUpdateOrder}
+            disabled={!isEditable || loading}
+            className={`py-3 rounded-lg ${isEditable ? 'bg-blue-500' : 'bg-gray-400'}`}
+          >
+            <Text className="text-white font-bold text-center">
+              {loading ? 'Actualizando...' : 'Actualizar Pedido'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </ScrollView>
   );
