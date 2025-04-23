@@ -17,8 +17,6 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
     <tr>
       <td style="padding: 8px; border: 1px solid #ddd;">${product.producto}</td>
       <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${product.cantidad}</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${product.precio || 0}</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(product.precio || 0) * product.cantidad}</td>
     </tr>
   `).join('');
   
@@ -36,79 +34,86 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
       <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th { background-color: #f2f2f2; padding: 10px; border: 1px solid #ddd; }
-        .header { background-color: #0284c7; color: white; padding: 10px; margin-bottom: 20px; }
-        .info-card { background-color: #f9fafb; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .info-row { display: flex; margin-bottom: 8px; }
-        .info-label { font-weight: bold; width: 140px; }
-        .total-row { 
-          font-weight: bold; 
-          background-color: #f9fafb;
+        th { background-color: #0284c7; color: white; padding: 10px; border: 1px solid #ddd; }
+        .header { 
+          background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+          color: white; 
+          padding: 20px; 
+          margin-bottom: 20px;
+          border-radius: 8px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .total-cell {
-          text-align: right;
-          padding: 10px;
-          border: 1px solid #ddd;
+        .header h1 { margin: 0; }
+        .info-card { 
+          background-color: #f9fafb; 
+          padding: 20px; 
+          border-radius: 8px; 
+          margin-bottom: 20px;
+          border: 1px solid #e5e7eb;
         }
+        .info-row { display: flex; margin-bottom: 12px; }
+        .info-label { font-weight: bold; width: 140px; color: #374151; }
+        .info-value { color: #1f2937; }
+        tr:nth-child(even) { background-color: #f9fafb; }
+        tr:hover { background-color: #f3f4f6; }
         @media print {
           body { margin: 0; }
           .no-print { display: none; }
+          th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       </style>
     </head>
     <body>
       <div class="header">
         <h1>Pedido #${order.id.substring(0, 8)}</h1>
+        <div style="margin-top: 8px; font-size: 14px; opacity: 0.9;">
+          Generado el ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}
+        </div>
       </div>
       
       <div class="info-card">
         <div class="info-row">
           <div class="info-label">Fecha de Pedido:</div>
-          <div>${orderDate}</div>
+          <div class="info-value">${orderDate}</div>
         </div>
         <div class="info-row">
           <div class="info-label">Fecha de Entrega:</div>
-          <div>${deliveryDate}</div>
+          <div class="info-value">${deliveryDate}</div>
         </div>
         <div class="info-row">
           <div class="info-label">Es Feriado:</div>
-          <div>${order.esFeriado ? 'Sí' : 'No'}</div>
+          <div class="info-value">${order.esFeriado ? 'Sí' : 'No'}</div>
         </div>
         <div class="info-row">
           <div class="info-label">Estado:</div>
-          <div>${order.estado}</div>
+          <div class="info-value">${order.estado}</div>
         </div>
         ${order.observaciones ? `
         <div class="info-row" style="display: block; margin-top: 10px;">
-          <div class="info-label">Observaciones:</div>
-          <div style="padding: 8px; background: #f3f4f6; border-radius: 4px; margin-top: 5px;">
+          <div class="info-label" style="margin-bottom: 8px;">Observaciones:</div>
+          <div style="padding: 12px; background: #f3f4f6; border-radius: 6px; color: #4b5563;">
             ${order.observaciones}
           </div>
         </div>
         ` : ''}
       </div>
       
-      <h2>Productos (${order.productos.reduce((sum, p) => sum + p.cantidad, 0)})</h2>
+      <h2 style="color: #1f2937;">Productos (${order.productos.reduce((sum, p) => sum + p.cantidad, 0)})</h2>
       <table>
         <thead>
           <tr>
             <th>Producto</th>
             <th>Cantidad</th>
-            <th>Precio</th>
-            <th>Subtotal</th>
           </tr>
         </thead>
         <tbody>
           ${productsRows}
-          <tr class="total-row">
-            <td colspan="3" class="total-cell">Total:</td>
-            <td class="total-cell">${total}</td>
-          </tr>
         </tbody>
       </table>
       
-      <div style="margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
-        <p>Panbol • ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: es })}</p>
+      <div style="margin-top: 40px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+        <p>Panbol • Sistema de Gestión de Pedidos</p>
       </div>
     </body>
     </html>
