@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 
 /**
  * Genera un HTML básico para representar un pedido
@@ -91,24 +92,20 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
 };
 
 /**
- * Exporta un pedido como PDF para web (fallback: usa HTML cuando no sea posible generar PDF)
+ * Exporta un pedido como PDF para web
  */
 const exportOrderToPdfWeb = async (order: OrderWithDetails): Promise<boolean> => {
   try {
-    // En web, como alternativa simplificada, ofrecemos un HTML para imprimir/guardar como PDF
     const htmlContent = generateOrderHtml(order);
     
-    // Crear un iframe para imprimir
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
     
-    // Verificar que el documento existe antes de escribir en él
     if (iframe.contentDocument) {
       iframe.contentDocument.write(htmlContent);
       iframe.contentDocument.close();
       
-      // Abrir ventana de impresión si tenemos contentWindow
       if (iframe.contentWindow) {
         iframe.contentWindow.onload = function() {
           setTimeout(() => {
@@ -118,7 +115,6 @@ const exportOrderToPdfWeb = async (order: OrderWithDetails): Promise<boolean> =>
       }
     }
     
-    // Limpiar después de un tiempo
     setTimeout(() => {
       document.body.removeChild(iframe);
     }, 2000);
@@ -126,68 +122,44 @@ const exportOrderToPdfWeb = async (order: OrderWithDetails): Promise<boolean> =>
     return true;
   } catch (error) {
     console.error('Error al exportar a PDF en web:', error);
-    
-    // Plan B: Ofrecer descarga directa del HTML
-    try {
-      const htmlContent = generateOrderHtml(order);
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pedido_${order.id.substring(0, 8)}.html`;
-      document.body.appendChild(a);
-      a.click();
-      
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
-      
-      return true;
-    } catch (fallbackError) {
-      console.error('Error en el fallback HTML:', fallbackError);
-      return false;
-    }
+    return false;
   }
 };
 
 /**
- * Exporta un pedido como PDF para dispositivos móviles
+ * Exporta un pedido como PDF para dispositivos móviles usando expo-print
  */
 const exportOrderToPdfMobile = async (order: OrderWithDetails): Promise<boolean> => {
   try {
-    // Verificar si se puede compartir
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
       console.warn('La exportación no está disponible en este dispositivo');
       return false;
     }
-    
+
     const htmlContent = generateOrderHtml(order);
     
-    // Para dispositivos móviles, convertir HTML a PDF y guardar como archivo temporal
-    const tempHtmlFile = `${FileSystem.cacheDirectory}tempOrder_${order.id.substring(0, 8)}.html`;
-    await FileSystem.writeAsStringAsync(tempHtmlFile, htmlContent, {
-      encoding: FileSystem.EncodingType.UTF8
+    // Generar el PDF usando expo-print
+    const { uri } = await Print.printToFileAsync({
+      html: htmlContent,
+      base64: false
     });
     
-    const pdfFile = `${FileSystem.cacheDirectory}pedido_${order.id.substring(0, 8)}.pdf`;
-    
-    // Intentamos mostrar un visor de HTML que permita guardar como PDF
+    // Compartir el archivo PDF
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: `Pedido #${order.id.substring(0, 8)}`,
+      UTI: 'com.adobe.pdf'
+    });
+
+    // Limpiar el archivo temporal
     try {
-      // Intentar compartir directamente el archivo HTML
-      await Sharing.shareAsync(tempHtmlFile, {
-        mimeType: 'text/html',
-        dialogTitle: `Pedido #${order.id.substring(0, 8)}`,
-        UTI: 'public.html'
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('Error al compartir HTML:', error);
-      return false;
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    } catch (cleanupError) {
+      console.warn('No se pudo eliminar el archivo temporal:', cleanupError);
     }
+
+    return true;
   } catch (error) {
     console.error('Error al exportar a PDF en móvil:', error);
     return false;

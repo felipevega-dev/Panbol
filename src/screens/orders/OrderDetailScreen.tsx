@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
 import { OrderWithDetails, OrderStatus } from '../../types';
-import { printOrderToPdf } from '../../utils/exportPrint';
+import { exportOrderToPdf } from '../../utils/exportPdf';
 import { exportOrderToExcel } from '../../utils/exportExcel';
 
 // URL de imagen placeholder para productos sin imagen
@@ -22,6 +22,7 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [changeStatusLoading, setChangeStatusLoading] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     loadOrderDetails();
@@ -42,6 +43,15 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const handleDeleteOrder = async () => {
+    console.log('Iniciando eliminación del pedido:', orderId);
+    
+    // En web usamos nuestro modal personalizado
+    if (Platform.OS === 'web') {
+      setShowDeleteModal(true);
+      return;
+    }
+
+    // En móvil usamos Alert.alert
     Alert.alert(
       'Confirmar eliminación',
       '¿Estás seguro de que deseas eliminar este pedido? Esta acción no se puede deshacer.',
@@ -53,18 +63,33 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           onPress: async () => {
             try {
               await removeOrder(orderId);
-              Alert.alert('Éxito', 'El pedido ha sido eliminado correctamente');
-              navigation.goBack();
+              Alert.alert('Éxito', 'El pedido ha sido eliminado correctamente', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+              ]);
             } catch (error) {
               Alert.alert(
                 'Error',
                 'No se pudo eliminar el pedido: ' + (error instanceof Error ? error.message : 'Error desconocido')
               );
             }
-          },
+          }
         },
       ]
     );
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await removeOrder(orderId);
+      setShowDeleteModal(false);
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error al eliminar pedido:', error);
+      Alert.alert(
+        'Error',
+        'No se pudo eliminar el pedido: ' + (error instanceof Error ? error.message : 'Error desconocido')
+      );
+    }
   };
 
   const handleExportPDF = async () => {
@@ -77,10 +102,13 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setShowExportOptions(false);
     
     try {
-      const result = await printOrderToPdf(selectedOrder);
+      const result = await exportOrderToPdf(selectedOrder);
       
       if (result) {
-        Alert.alert('Éxito', 'El pedido ha sido exportado a PDF correctamente');
+        if (Platform.OS === 'web') {
+          Alert.alert('Éxito', 'El pedido ha sido exportado a PDF correctamente');
+        }
+        // En móviles no mostramos alerta porque el sistema muestra el diálogo de compartir
       } else {
         Alert.alert('Error', 'No se pudo exportar el pedido a PDF');
       }
@@ -154,142 +182,178 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const totalItems = selectedOrder.productos.reduce((sum, p) => sum + p.cantidad, 0);
 
   return (
-    <ScrollView className="flex-1 bg-gray-100">
-      <View className="p-4 bg-white border-b border-gray-200">
-        <Text className="text-xl font-bold text-gray-800">Pedido #{selectedOrder.id.substring(0, 8)}</Text>
-        <View className="flex-row items-center mt-1">
-          <View className={`h-2 w-2 rounded-full mr-2 ${selectedOrder.estado === 'PENDIENTE' ? 'bg-orange-500' : selectedOrder.estado === 'ENTREGADO' ? 'bg-green-500' : 'bg-red-500'}`} />
-          <Text className="text-gray-600">{selectedOrder.estado}</Text>
+    <>
+      <ScrollView className="flex-1 bg-gray-100">
+        <View className="p-4 bg-white border-b border-gray-200">
+          <Text className="text-xl font-bold text-gray-800">Pedido #{selectedOrder.id.substring(0, 8)}</Text>
+          <View className="flex-row items-center mt-1">
+            <View className={`h-2 w-2 rounded-full mr-2 ${selectedOrder.estado === 'PENDIENTE' ? 'bg-orange-500' : selectedOrder.estado === 'ENTREGADO' ? 'bg-green-500' : 'bg-red-500'}`} />
+            <Text className="text-gray-600">{selectedOrder.estado}</Text>
+          </View>
         </View>
-      </View>
 
-      <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800 mb-3">Acciones</Text>
-        
-        <View className="flex-row flex-wrap justify-start mb-4 gap-2">
-          {isEditable && (
-            <TouchableOpacity 
-              className="bg-blue-500 py-2 px-4 rounded-md flex-row items-center"
-              onPress={handleEditOrder}
-            >
-              <Ionicons name="create-outline" size={20} color="white" />
-              <Text className="text-white font-bold ml-1">Editar</Text>
-            </TouchableOpacity>
-          )}
+        <View className="p-4">
+          <Text className="text-lg font-bold text-gray-800 mb-3">Acciones</Text>
           
-          <TouchableOpacity 
-            className="bg-red-500 py-2 px-4 rounded-md flex-row items-center"
-            onPress={handleDeleteOrder}
-          >
-            <Ionicons name="trash-outline" size={20} color="white" />
-            <Text className="text-white font-bold ml-1">Eliminar</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            className="bg-green-600 py-2 px-4 rounded-md flex-row items-center"
-            onPress={toggleExportOptions}
-            disabled={exportLoading}
-          >
-            {exportLoading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <Ionicons name="download-outline" size={20} color="white" />
-                <Text className="text-white font-bold ml-1">Exportar</Text>
-                <Ionicons 
-                  name={showExportOptions ? "chevron-up-outline" : "chevron-down-outline"} 
-                  size={16} 
-                  color="white" 
-                  style={{ marginLeft: 4 }}
-                />
-              </>
+          <View className="flex-row flex-wrap justify-start mb-4 gap-2">
+            {isEditable && (
+              <TouchableOpacity 
+                className="bg-blue-500 py-2 px-4 rounded-md flex-row items-center"
+                onPress={handleEditOrder}
+              >
+                <Ionicons name="create-outline" size={20} color="white" />
+                <Text className="text-white font-bold ml-1">Editar</Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            className="bg-purple-500 py-2 px-4 rounded-md flex-row items-center"
-            onPress={() => setShowStatusModal(true)}
-            disabled={changeStatusLoading}
-          >
-            {changeStatusLoading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <Ionicons name="refresh-outline" size={20} color="white" />
-                <Text className="text-white font-bold ml-1">Cambiar Estado</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Opciones de exportación */}
-        {showExportOptions && (
-          <View className="bg-white rounded-lg shadow-sm p-2 mb-4">
-            <TouchableOpacity 
-              className="py-2 px-3 flex-row items-center border-b border-gray-100"
-              onPress={handleExportExcel}
-            >
-              <Ionicons name="document-outline" size={20} color="#16a34a" />
-              <Text className="ml-2 text-gray-800">Exportar a Excel</Text>
-            </TouchableOpacity>
             
             <TouchableOpacity 
-              className="py-2 px-3 flex-row items-center"
-              onPress={handleExportPDF}
+              className="bg-red-500 py-2 px-4 rounded-md flex-row items-center"
+              onPress={handleDeleteOrder}
             >
-              <Ionicons name="document-text-outline" size={20} color="#e11d48" />
-              <Text className="ml-2 text-gray-800">Exportar a PDF</Text>
+              <Ionicons name="trash-outline" size={20} color="white" />
+              <Text className="text-white font-bold ml-1">Eliminar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              className="bg-green-600 py-2 px-4 rounded-md flex-row items-center"
+              onPress={toggleExportOptions}
+              disabled={exportLoading}
+            >
+              {exportLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <Ionicons name="download-outline" size={20} color="white" />
+                  <Text className="text-white font-bold ml-1">Exportar</Text>
+                  <Ionicons 
+                    name={showExportOptions ? "chevron-up-outline" : "chevron-down-outline"} 
+                    size={16} 
+                    color="white" 
+                    style={{ marginLeft: 4 }}
+                  />
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              className="bg-purple-500 py-2 px-4 rounded-md flex-row items-center"
+              onPress={() => setShowStatusModal(true)}
+              disabled={changeStatusLoading}
+            >
+              {changeStatusLoading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <Ionicons name="refresh-outline" size={20} color="white" />
+                  <Text className="text-white font-bold ml-1">Cambiar Estado</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        )}
 
-        <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>
-          
-          <View className="flex-row mb-2">
-            <Text className="text-gray-600 font-medium w-1/3">Fecha de Pedido:</Text>
-            <Text className="text-gray-800">{format(new Date(selectedOrder.fechaPedido), 'dd/MM/yyyy', { locale: es })}</Text>
-          </View>
-          
-          <View className="flex-row mb-2">
-            <Text className="text-gray-600 font-medium w-1/3">Fecha de Entrega:</Text>
-            <Text className="text-gray-800">{format(new Date(selectedOrder.fechaEntrega), 'dd/MM/yyyy', { locale: es })}</Text>
-          </View>
-          
-          <View className="flex-row mb-2">
-            <Text className="text-gray-600 font-medium w-1/3">Es Feriado:</Text>
-            <Text className="text-gray-800">{selectedOrder.esFeriado ? 'Sí' : 'No'}</Text>
-          </View>
-          
-          {selectedOrder.observaciones && (
-            <View className="mb-2">
-              <Text className="text-gray-600 font-medium">Observaciones:</Text>
-              <Text className="text-gray-800 mt-1 p-2 bg-gray-50 rounded">{selectedOrder.observaciones}</Text>
+          {/* Opciones de exportación */}
+          {showExportOptions && (
+            <View className="bg-white rounded-lg shadow-sm p-2 mb-4">
+              <TouchableOpacity 
+                className="py-2 px-3 flex-row items-center border-b border-gray-100"
+                onPress={handleExportExcel}
+              >
+                <Ionicons name="document-outline" size={20} color="#16a34a" />
+                <Text className="ml-2 text-gray-800">Exportar a Excel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                className="py-2 px-3 flex-row items-center"
+                onPress={handleExportPDF}
+              >
+                <Ionicons name="document-text-outline" size={20} color="#e11d48" />
+                <Text className="ml-2 text-gray-800">Exportar a PDF</Text>
+              </TouchableOpacity>
             </View>
           )}
-        </View>
 
-        <Text className="text-lg font-bold text-gray-800 mb-2">Productos ({totalItems})</Text>
-        
-        {selectedOrder.productos.map((product) => (
-          <View 
-            key={product.id} 
-            className="flex-row items-center bg-white p-3 rounded-lg shadow-sm mb-2"
-          >
-            <Image 
-              source={{ uri: product.imagen || placeholderImage }} 
-              className="w-16 h-16 rounded mr-3"
-              defaultSource={{ uri: placeholderImage }}
-            />
+          <View className="bg-white rounded-lg shadow-sm p-4 mb-4">
+            <Text className="text-lg font-bold text-gray-800 mb-2">Detalles del Pedido</Text>
             
-            <View className="flex-1">
-              <Text className="font-bold text-gray-800">{product.producto}</Text>
-              <Text className="text-gray-500">{product.categoria}</Text>
-              <Text className="text-gray-700 font-medium">Cantidad: {product.cantidad}</Text>
+            <View className="flex-row mb-2">
+              <Text className="text-gray-600 font-medium w-1/3">Fecha de Pedido:</Text>
+              <Text className="text-gray-800">{format(new Date(selectedOrder.fechaPedido), 'dd/MM/yyyy', { locale: es })}</Text>
+            </View>
+            
+            <View className="flex-row mb-2">
+              <Text className="text-gray-600 font-medium w-1/3">Fecha de Entrega:</Text>
+              <Text className="text-gray-800">{format(new Date(selectedOrder.fechaEntrega), 'dd/MM/yyyy', { locale: es })}</Text>
+            </View>
+            
+            <View className="flex-row mb-2">
+              <Text className="text-gray-600 font-medium w-1/3">Es Feriado:</Text>
+              <Text className="text-gray-800">{selectedOrder.esFeriado ? 'Sí' : 'No'}</Text>
+            </View>
+            
+            {selectedOrder.observaciones && (
+              <View className="mb-2">
+                <Text className="text-gray-600 font-medium">Observaciones:</Text>
+                <Text className="text-gray-800 mt-1 p-2 bg-gray-50 rounded">{selectedOrder.observaciones}</Text>
+              </View>
+            )}
+          </View>
+
+          <Text className="text-lg font-bold text-gray-800 mb-2">Productos ({totalItems})</Text>
+          
+          {selectedOrder.productos.map((product) => (
+            <View 
+              key={product.id} 
+              className="flex-row items-center bg-white p-3 rounded-lg shadow-sm mb-2"
+            >
+              <Image 
+                source={{ uri: product.imagen || placeholderImage }} 
+                className="w-16 h-16 rounded mr-3"
+                defaultSource={{ uri: placeholderImage }}
+              />
+              
+              <View className="flex-1">
+                <Text className="font-bold text-gray-800">{product.producto}</Text>
+                <Text className="text-gray-500">{product.categoria}</Text>
+                <Text className="text-gray-700 font-medium">Cantidad: {product.cantidad}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Modal de confirmación para eliminar (web) */}
+      {showDeleteModal && (
+        <View className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <View className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-gray-800">Confirmar eliminación</Text>
+              <TouchableOpacity onPress={() => setShowDeleteModal(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text className="text-gray-600 mb-6">
+              ¿Estás seguro de que deseas eliminar este pedido? Esta acción no se puede deshacer.
+            </Text>
+            
+            <View className="flex-row justify-end space-x-3">
+              <TouchableOpacity
+                className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200"
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text className="text-gray-800 font-medium">Cancelar</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                className="px-4 py-2 rounded-md bg-red-500 hover:bg-red-600"
+                onPress={confirmDelete}
+              >
+                <Text className="text-white font-medium">Eliminar</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        ))}
-      </View>
+        </View>
+      )}
 
       {/* Modal para cambiar estado - Funciona tanto en móvil como en web */}
       {showStatusModal && (
@@ -327,7 +391,7 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       )}
-    </ScrollView>
+    </>
   );
 };
 
