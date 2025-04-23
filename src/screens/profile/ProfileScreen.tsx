@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MainTabScreenProps } from '../../navigation/types';
+import { ProfileScreenProps } from '../../navigation/types';
 import { useAuth } from '../../contexts/AuthContext';
 
-type Props = MainTabScreenProps<'Profile'>;
+type Props = ProfileScreenProps<'ProfileMain'>;
 
-const ProfileScreen: React.FC<Props> = () => {
+const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user, logout, loading } = useAuth();
 
   const handleLogout = async () => {
@@ -37,7 +37,10 @@ const ProfileScreen: React.FC<Props> = () => {
         <Text className="text-lg font-bold text-gray-800 mb-4">Mi Cuenta</Text>
 
         <View className="bg-white rounded-lg shadow-sm mb-4">
-          <TouchableOpacity className="p-4 border-b border-gray-200 flex-row items-center">
+          <TouchableOpacity 
+            className="p-4 border-b border-gray-200 flex-row items-center"
+            onPress={() => navigation.getParent()?.navigate('Orders')}
+          >
             <Ionicons name="document-text-outline" size={22} color="#3B82F6" className="mr-3" />
             <View className="flex-1 ml-3">
               <Text className="text-gray-800 font-medium">Mis Pedidos</Text>
@@ -55,7 +58,10 @@ const ProfileScreen: React.FC<Props> = () => {
             <Ionicons name="chevron-forward" size={22} color="#9CA3AF" />
           </TouchableOpacity>
 
-          <TouchableOpacity className="p-4 flex-row items-center">
+          <TouchableOpacity 
+            className="p-4 flex-row items-center"
+            onPress={() => navigation.navigate('Settings')}
+          >
             <Ionicons name="settings-outline" size={22} color="#3B82F6" className="mr-3" />
             <View className="flex-1 ml-3">
               <Text className="text-gray-800 font-medium">Configuración</Text>
@@ -68,7 +74,10 @@ const ProfileScreen: React.FC<Props> = () => {
         <Text className="text-lg font-bold text-gray-800 mb-4">Información</Text>
 
         <View className="bg-white rounded-lg shadow-sm mb-6">
-          <TouchableOpacity className="p-4 border-b border-gray-200 flex-row items-center">
+          <TouchableOpacity 
+            className="p-4 border-b border-gray-200 flex-row items-center"
+            onPress={() => navigation.navigate('Help')}
+          >
             <Ionicons name="help-circle-outline" size={22} color="#3B82F6" className="mr-3" />
             <View className="flex-1 ml-3">
               <Text className="text-gray-800 font-medium">Ayuda</Text>
@@ -77,7 +86,16 @@ const ProfileScreen: React.FC<Props> = () => {
             <Ionicons name="chevron-forward" size={22} color="#9CA3AF" />
           </TouchableOpacity>
 
-          <TouchableOpacity className="p-4 flex-row items-center">
+          <TouchableOpacity 
+            className="p-4 flex-row items-center"
+            onPress={() => 
+              Alert.alert(
+                "Acerca de Panbol",
+                "Versión: 1.0.0\nDesarrollado por: Tu equipo\nContacto: contacto@panbol.com",
+                [{ text: "OK" }]
+              )
+            }
+          >
             <Ionicons name="information-circle-outline" size={22} color="#3B82F6" className="mr-3" />
             <View className="flex-1 ml-3">
               <Text className="text-gray-800 font-medium">Acerca de</Text>

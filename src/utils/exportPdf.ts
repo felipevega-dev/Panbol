@@ -17,8 +17,6 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
     <tr>
       <td style="padding: 8px; border: 1px solid #ddd;">${product.producto}</td>
       <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${product.cantidad}</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${product.precio || 0}</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(product.precio || 0) * product.cantidad}</td>
     </tr>
   `).join('');
   
@@ -81,8 +79,6 @@ const generateOrderHtml = (order: OrderWithDetails): string => {
           <tr>
             <th>Producto</th>
             <th>Cantidad</th>
-            <th>Precio</th>
-            <th>Subtotal</th>
           </tr>
         </thead>
         <tbody>

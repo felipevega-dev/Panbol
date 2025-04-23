@@ -41,6 +41,7 @@ interface OrderContextValue extends OrderContextState {
   resetSelectedProducts: () => void;
   loadAvailableProducts: () => Promise<void>;
   canEditOrder: (order: Order) => boolean;
+  updateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<void>;
 }
 
 const OrderContext = createContext<OrderContextValue | null>(null);
@@ -380,6 +381,29 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     return sameDay && before8PM;
   };
 
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
+    
+    try {
+      await updateOrder(orderId, { estado: newStatus }, []);
+      await getOrders(); // Recargar la lista de pedidos
+      if (state.selectedOrder && state.selectedOrder.id === orderId) {
+        await getOrderDetails(orderId); // Actualizar el pedido seleccionado si coincide
+      }
+      
+      setState(prev => ({
+        ...prev,
+        loading: false
+      }));
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Error al actualizar estado del pedido'
+      }));
+    }
+  };
+
   const contextValue: OrderContextValue = {
     ...state,
     getOrders,
@@ -392,7 +416,8 @@ export const OrderProvider: React.FC<OrderProviderProps> = ({ children }) => {
     selectProduct,
     resetSelectedProducts,
     loadAvailableProducts,
-    canEditOrder
+    canEditOrder,
+    updateOrderStatus
   };
 
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../navigation/types';
@@ -59,6 +59,7 @@ export const LoginScreen = () => {
   };
   
   const loading = isSubmitting || authLoading;
+  const isMobile = Platform.OS === 'android' || Platform.OS === 'ios';
   
   return (
     <View className="flex-1 bg-white">
@@ -113,22 +114,26 @@ export const LoginScreen = () => {
           )}
         </TouchableOpacity>
         
-        <View className="my-4 flex-row items-center">
-          <View className="flex-1 h-0.5 bg-gray-200" />
-          <Text className="mx-4 text-gray-500">O</Text>
-          <View className="flex-1 h-0.5 bg-gray-200" />
-        </View>
+        {!isMobile && (
+          <>
+            <View className="my-4 flex-row items-center">
+              <View className="flex-1 h-0.5 bg-gray-200" />
+              <Text className="mx-4 text-gray-500">O</Text>
+              <View className="flex-1 h-0.5 bg-gray-200" />
+            </View>
 
-        <TouchableOpacity 
-          className="p-3 rounded-md flex-row justify-center items-center bg-white border border-gray-300"
-          onPress={handleGoogleLogin}
-          disabled={loading}
-        >
-          <Ionicons name="logo-google" size={20} color="#DB4437" />
-          <Text className="text-gray-800 text-center font-medium ml-2">
-            Continuar con Google
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity 
+              className="p-3 rounded-md flex-row justify-center items-center bg-white border border-gray-300"
+              onPress={handleGoogleLogin}
+              disabled={loading}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <Text className="text-gray-800 text-center font-medium ml-2">
+                Continuar con Google
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
         
         <TouchableOpacity 
           className="mt-6"

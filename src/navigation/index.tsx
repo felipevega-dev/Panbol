@@ -12,14 +12,15 @@ import {
   AuthStackParamList, 
   MainTabParamList,
   OrdersStackParamList,
-  AdminStackParamList
+  AdminStackParamList,
+  ProfileStackParamList
 } from './types';
 
 // Importación de pantallas de autenticación
 import { LoginScreen, RegisterScreen } from '../screens/auth';
 
-// Importación de la pantalla de perfil
-import ProfileScreen from '../screens/profile/ProfileScreen';
+// Importación de pantallas de perfil
+import { ProfileScreen, SettingsScreen, HelpScreen } from '../screens/profile';
 
 // Importación de pantallas de pedidos
 import OrdersScreen from '../screens/orders/OrdersScreen';
@@ -36,6 +37,7 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainTab = createBottomTabNavigator<MainTabParamList>();
 const OrdersStack = createNativeStackNavigator<OrdersStackParamList>();
 const AdminStack = createNativeStackNavigator<AdminStackParamList>();
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 
 // Navegador de autenticación
 const AuthNavigator = () => (
@@ -79,6 +81,27 @@ const AdminNavigator = () => (
   </AdminStack.Navigator>
 );
 
+// Navegador de perfil
+const ProfileNavigator = () => (
+  <ProfileStack.Navigator>
+    <ProfileStack.Screen 
+      name="ProfileMain" 
+      component={ProfileScreen} 
+      options={{ headerTitle: 'Mi Perfil' }}
+    />
+    <ProfileStack.Screen 
+      name="Settings" 
+      component={SettingsScreen} 
+      options={{ headerTitle: 'Configuración' }}
+    />
+    <ProfileStack.Screen 
+      name="Help" 
+      component={HelpScreen} 
+      options={{ headerTitle: 'Ayuda y Soporte' }}
+    />
+  </ProfileStack.Navigator>
+);
+
 // Navegador principal con pestañas
 const MainNavigator = () => (
   <MainTab.Navigator
@@ -114,8 +137,8 @@ const MainNavigator = () => (
     />
     <MainTab.Screen 
       name="Profile" 
-      component={ProfileScreen} 
-      options={{ title: 'Perfil' }}
+      component={ProfileNavigator} 
+      options={{ headerShown: false, title: 'Perfil' }}
     />
     <MainTab.Screen 
       name="Admin" 

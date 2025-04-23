@@ -29,6 +29,13 @@ export type AdminStackParamList = {
   ProductsAdmin: undefined;
 };
 
+// Tipos para la navegación de perfil
+export type ProfileStackParamList = {
+  ProfileMain: undefined;
+  Settings: undefined;
+  Help: undefined;
+};
+
 // Tipos para la navegación raíz
 export type RootStackParamList = {
   Auth: undefined;
@@ -58,4 +65,11 @@ export type AdminScreenProps<T extends keyof AdminStackParamList> =
   CompositeScreenProps<
     NativeStackScreenProps<AdminStackParamList, T>,
     MainTabScreenProps<'Admin'>
+  >;
+
+// Tipo para las propiedades de pantalla de Profile
+export type ProfileScreenProps<T extends keyof ProfileStackParamList> = 
+  CompositeScreenProps<
+    NativeStackScreenProps<ProfileStackParamList, T>,
+    MainTabScreenProps<'Profile'>
   >;

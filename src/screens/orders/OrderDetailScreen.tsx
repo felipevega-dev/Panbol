@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
-import { OrderWithDetails } from '../../types';
+import { OrderWithDetails, OrderStatus } from '../../types';
 import { printOrderToPdf } from '../../utils/exportPrint';
 import { exportOrderToExcel } from '../../utils/exportExcel';
 
@@ -17,9 +17,11 @@ type Props = OrdersScreenProps<'OrderDetail'>;
 
 const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId } = route.params;
-  const { getOrderDetails, canEditOrder, removeOrder, selectedOrder, loading } = useOrders();
+  const { getOrderDetails, canEditOrder, removeOrder, selectedOrder, loading, updateOrderStatus } = useOrders();
   const [exportLoading, setExportLoading] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
+  const [changeStatusLoading, setChangeStatusLoading] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
 
   useEffect(() => {
     loadOrderDetails();
@@ -122,6 +124,23 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setShowExportOptions(!showExportOptions);
   };
 
+  const handleChangeStatus = async (status: OrderStatus) => {
+    if (!selectedOrder) return;
+    
+    setChangeStatusLoading(true);
+    setShowStatusModal(false);
+    
+    try {
+      await updateOrderStatus(orderId, status);
+      Alert.alert('Éxito', `El estado del pedido ha sido cambiado a ${status}`);
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo cambiar el estado del pedido');
+      console.error(error);
+    } finally {
+      setChangeStatusLoading(false);
+    }
+  };
+
   if (loading || !selectedOrder) {
     return (
       <View className="flex-1 justify-center items-center">
@@ -183,6 +202,21 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   color="white" 
                   style={{ marginLeft: 4 }}
                 />
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            className="bg-purple-500 py-2 px-4 rounded-md flex-row items-center"
+            onPress={() => setShowStatusModal(true)}
+            disabled={changeStatusLoading}
+          >
+            {changeStatusLoading ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <Ionicons name="refresh-outline" size={20} color="white" />
+                <Text className="text-white font-bold ml-1">Cambiar Estado</Text>
               </>
             )}
           </TouchableOpacity>
@@ -256,6 +290,43 @@ const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         ))}
       </View>
+
+      {/* Modal para cambiar estado - Funciona tanto en móvil como en web */}
+      {showStatusModal && (
+        <View className="absolute top-0 left-0 right-0 bottom-0 bg-black bg-opacity-50 justify-center items-center z-50">
+          <View className="bg-white rounded-lg p-4 w-72">
+            <Text className="text-lg font-bold text-center mb-4">Cambiar Estado</Text>
+            
+            <TouchableOpacity 
+              className="py-3 border-b border-gray-200"
+              onPress={() => handleChangeStatus('PENDIENTE')}
+            >
+              <Text className="text-center text-orange-500 font-medium">PENDIENTE</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              className="py-3 border-b border-gray-200"
+              onPress={() => handleChangeStatus('ENTREGADO')}
+            >
+              <Text className="text-center text-green-500 font-medium">ENTREGADO</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              className="py-3 mb-2"
+              onPress={() => handleChangeStatus('CANCELADO')}
+            >
+              <Text className="text-center text-red-500 font-medium">CANCELADO</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              className="bg-gray-200 py-2 rounded-md"
+              onPress={() => setShowStatusModal(false)}
+            >
+              <Text className="text-center font-medium">Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 };
