@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Platform, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Checkbox } from 'react-native-paper';
 
 import { OrdersScreenProps } from '../../navigation/types';
 import { useOrders } from '../../contexts/OrderContext';
@@ -14,8 +15,27 @@ type Props = OrdersScreenProps<'OrdersList'>;
 enum SortOptions {
   DATE_DESC = 'Más recientes',
   DATE_ASC = 'Más antiguos',
-  STATUS = 'Por estado'
+  STATUS = 'Por estado',
+  LAST_EDITED = 'Último editado'
 }
+
+interface FilterOptions {
+  onlyEdited: boolean;
+  onlyHolidays: boolean;
+}
+
+const isUpdated = (order: Order) => {
+  // Si el pedido tiene fechas de creación y actualización
+  if (order.createdAt && order.updatedAt) {
+    const createdDate = new Date(order.createdAt).getTime();
+    const updatedDate = new Date(order.updatedAt).getTime();
+    
+    // Si la diferencia es mayor a 1 minuto (60000 ms), consideramos que fue editado
+    // Esto evita que se muestre "Editado" para pedidos recién creados
+    return (updatedDate - createdDate) > 60000;
+  }
+  return false;
+};
 
 const OrdersScreen: React.FC<Props> = ({ navigation }) => {
   const { orders, loading, getOrders, exportOrdersToExcel, canEditOrder } = useOrders();
@@ -25,6 +45,11 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
   const [page, setPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showSortOptions, setShowSortOptions] = useState(false);
+  const [filters, setFilters] = useState<FilterOptions>({
+    onlyEdited: false,
+    onlyHolidays: false
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     getOrders();
@@ -34,24 +59,31 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
   const sortedOrders = React.useMemo(() => {
     let result = [...orders];
     
+    // Aplicar filtros
+    if (filters.onlyEdited) {
+      result = result.filter(order => isUpdated(order));
+    }
+    if (filters.onlyHolidays) {
+      result = result.filter(order => order.esFeriado);
+    }
+    
     switch (sortOption) {
       case SortOptions.DATE_DESC:
         return result.sort((a, b) => {
           const dateA = new Date(a.fechaPedido).getTime();
           const dateB = new Date(b.fechaPedido).getTime();
-          return dateB - dateA; // Orden descendente
+          return dateB - dateA;
         });
       
       case SortOptions.DATE_ASC:
         return result.sort((a, b) => {
           const dateA = new Date(a.fechaPedido).getTime();
           const dateB = new Date(b.fechaPedido).getTime();
-          return dateA - dateB; // Orden ascendente
+          return dateA - dateB;
         });
         
       case SortOptions.STATUS:
         return result.sort((a, b) => {
-          // Prioridad: PENDIENTE > ENTREGADO > CANCELADO
           const getStatusPriority = (status: string) => {
             switch (status.toUpperCase()) {
               case 'PENDIENTE': return 0;
@@ -60,14 +92,20 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
               default: return 3;
             }
           };
-          
           return getStatusPriority(a.estado) - getStatusPriority(b.estado);
+        });
+
+      case SortOptions.LAST_EDITED:
+        return result.sort((a, b) => {
+          const dateA = new Date(a.updatedAt).getTime();
+          const dateB = new Date(b.updatedAt).getTime();
+          return dateB - dateA;
         });
         
       default:
         return result;
     }
-  }, [orders, sortOption]);
+  }, [orders, sortOption, filters]);
   
   // Obtener los pedidos para la página actual
   const paginatedOrders = React.useMemo(() => {
@@ -140,19 +178,6 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const isUpdated = (order: Order) => {
-    // Si el pedido tiene fechas de creación y actualización
-    if (order.createdAt && order.updatedAt) {
-      const createdDate = new Date(order.createdAt).getTime();
-      const updatedDate = new Date(order.updatedAt).getTime();
-      
-      // Si la diferencia es mayor a 1 minuto (60000 ms), consideramos que fue editado
-      // Esto evita que se muestre "Editado" para pedidos recién creados
-      return (updatedDate - createdDate) > 60000;
-    }
-    return false;
-  };
-
   const renderOrderItem = ({ item }: { item: Order }) => {
     const statusColor = getStatusColor(item.estado);
     const isEditable = canEditOrder(item);
@@ -169,19 +194,20 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
               <Text className="text-lg font-bold text-gray-800">Pedido #{item.id.substring(0, 8)}</Text>
               <Text className="text-gray-600">Fecha: {formatDate(item.fechaPedido)}</Text>
               <Text className="text-gray-600">Entrega: {formatDate(item.fechaEntrega)}</Text>
-              
+            </View>
+            <View className="items-end">
+              <View className={`px-2 py-1 rounded-full ${statusColor} mb-1`}>
+                <Text className="text-white font-medium">{item.estado}</Text>
+              </View>
               {/* Mostrar cuándo fue editado el pedido */}
               {wasEdited && (
-                <View className="flex-row items-center mt-1">
-                  <Ionicons name="pencil" size={12} color="#6B7280" />
-                  <Text className="text-xs text-gray-500 ml-1">
+                <View className="flex-row items-center bg-amber-100 px-2 py-1 rounded-full">
+                  <Ionicons name="pencil" size={12} color="#92400E" />
+                  <Text className="text-xs text-amber-800 ml-1 font-medium">
                     Editado el {formatDateTime(item.updatedAt)}
                   </Text>
                 </View>
               )}
-            </View>
-            <View className={`px-2 py-1 rounded-full ${statusColor}`}>
-              <Text className="text-white font-medium">{item.estado}</Text>
             </View>
           </View>
           
@@ -240,8 +266,6 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View className="flex-1 bg-gray-100">
       <View className="p-4 flex-row justify-between items-center bg-white border-b border-gray-200">
-        <Text className="text-xl font-bold text-gray-800">Mis Pedidos</Text>
-        
         <View className="flex-row">
           <TouchableOpacity
             className="mr-2 flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
@@ -250,27 +274,35 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
             <Ionicons name="filter-outline" size={18} color="#4b5563" />
             <Text className="ml-1 text-gray-700 font-medium">{sortOption}</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
-            className="flex-row items-center bg-blue-600 px-3 py-2 rounded-lg"
-            onPress={handleExportExcel}
-            disabled={loading || orders.length === 0}
+            className="mr-2 flex-row items-center bg-gray-200 px-3 py-2 rounded-lg"
+            onPress={() => setShowFilters(!showFilters)}
           >
-            {loading ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <Ionicons name="download-outline" size={18} color="white" />
-                <Text className="ml-1 text-white font-medium">Exportar Excel</Text>
-              </>
-            )}
+            <Ionicons name="options-outline" size={18} color="#4b5563" />
+            <Text className="ml-1 text-gray-700 font-medium">Filtros</Text>
           </TouchableOpacity>
         </View>
+        
+        <TouchableOpacity
+          className="flex-row items-center bg-blue-600 px-3 py-2 rounded-lg"
+          onPress={handleExportExcel}
+          disabled={loading || orders.length === 0}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Ionicons name="download-outline" size={18} color="white" />
+              <Text className="ml-1 text-white font-medium">Exportar Excel</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
       
       {/* Opciones de ordenamiento */}
       {showSortOptions && (
-        <View className="absolute top-16 right-4 z-10 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+        <View className="absolute top-16 left-4 z-10 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden min-w-[200px]">
           {Object.values(SortOptions).map((option) => (
             <TouchableOpacity 
               key={option}
@@ -282,6 +314,27 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           ))}
+        </View>
+      )}
+
+      {/* Panel de filtros */}
+      {showFilters && (
+        <View className="absolute top-16 left-4 z-10 bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden min-w-[200px] p-4">
+          <Text className="text-lg font-bold text-gray-800 mb-2">Filtros</Text>
+          <View className="flex-row items-center mb-2">
+            <Checkbox
+              status={filters.onlyEdited ? 'checked' : 'unchecked'}
+              onPress={() => setFilters(prev => ({ ...prev, onlyEdited: !prev.onlyEdited }))}
+            />
+            <Text className="text-gray-700">Solo pedidos editados</Text>
+          </View>
+          <View className="flex-row items-center">
+            <Checkbox
+              status={filters.onlyHolidays ? 'checked' : 'unchecked'}
+              onPress={() => setFilters(prev => ({ ...prev, onlyHolidays: !prev.onlyHolidays }))}
+            />
+            <Text className="text-gray-700">Solo días feriados</Text>
+          </View>
         </View>
       )}
 
