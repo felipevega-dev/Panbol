@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator, Platform, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -37,8 +37,10 @@ const isUpdated = (order: Order) => {
   return false;
 };
 
-const OrdersScreen: React.FC<Props> = ({ navigation }) => {
+const OrdersScreen: React.FC<Props> = ({ navigation, route }) => {
   const { orders, loading, getOrders, exportOrdersToExcel, canEditOrder } = useOrders();
+  const flatListRef = useRef<FlatList>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   
   // Estado para ordenamiento y paginación
   const [sortOption, setSortOption] = useState<SortOptions>(SortOptions.DATE_DESC);
@@ -50,10 +52,6 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
     onlyHolidays: false
   });
   const [showFilters, setShowFilters] = useState(false);
-
-  useEffect(() => {
-    getOrders();
-  }, []);
 
   // Ordenar pedidos según la opción seleccionada
   const sortedOrders = React.useMemo(() => {
@@ -113,6 +111,34 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
     return sortedOrders.slice(startIndex, startIndex + itemsPerPage);
   }, [sortedOrders, page, itemsPerPage]);
   
+  useEffect(() => {
+    getOrders();
+  }, []);
+
+  // Efecto para manejar el scroll al pedido editado
+  useEffect(() => {
+    if (route.params?.editedOrderId && flatListRef.current) {
+      const editedOrderIndex = paginatedOrders.findIndex(
+        order => order.id === route.params.editedOrderId
+      );
+      
+      if (editedOrderIndex !== -1) {
+        flatListRef.current.scrollToIndex({
+          index: editedOrderIndex,
+          animated: true,
+          viewPosition: 0.5
+        });
+        
+        // Mostrar modal de éxito si se solicita
+        if (route.params?.showSuccessMessage) {
+          setShowSuccessModal(true);
+          // Ocultar después de 3 segundos
+          setTimeout(() => setShowSuccessModal(false), 3000);
+        }
+      }
+    }
+  }, [route.params?.editedOrderId, paginatedOrders]);
+
   // Cambiar opción de ordenamiento
   const handleSortChange = (option: SortOptions) => {
     setSortOption(option);
@@ -263,8 +289,58 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
+  // Renderizar modal de éxito
+  const renderSuccessModal = () => (
+    <Modal
+      transparent={true}
+      visible={showSuccessModal}
+      animationType="fade"
+    >
+      <View className="flex-1 justify-center items-center bg-black bg-opacity-50">
+        <View className="bg-white rounded-lg shadow-lg p-4 mx-4 max-w-sm">
+          <View className="items-center">
+            <View className="w-12 h-12 rounded-full bg-green-100 items-center justify-center mb-3">
+              <Ionicons name="checkmark" size={24} color="#22C55E" />
+            </View>
+            <Text className="text-lg font-bold text-gray-800 mb-1">¡Pedido Actualizado!</Text>
+            <Text className="text-gray-600 text-center">
+              El pedido ha sido actualizado correctamente
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Calcular altura de cada item para getItemLayout
+  const ITEM_HEIGHT = 150; // Ajusta este valor según la altura real de tus items
+
+  // Función para obtener las dimensiones de cada item
+  const getItemLayout = (_: any, index: number) => ({
+    length: ITEM_HEIGHT,
+    offset: ITEM_HEIGHT * index,
+    index,
+  });
+
+  // Manejar error de scroll
+  const handleScrollToIndexFailed = (info: {
+    index: number;
+    highestMeasuredFrameIndex: number;
+    averageItemLength: number;
+  }) => {
+    const wait = new Promise(resolve => setTimeout(resolve, 500));
+    wait.then(() => {
+      flatListRef.current?.scrollToIndex({
+        index: info.index,
+        animated: true,
+        viewPosition: 0.5
+      });
+    });
+  };
+
   return (
     <View className="flex-1 bg-gray-100">
+      {renderSuccessModal()}
       <View className="p-4 flex-row justify-between items-center bg-white border-b border-gray-200">
         <View className="flex-row">
           <TouchableOpacity
@@ -339,10 +415,13 @@ const OrdersScreen: React.FC<Props> = ({ navigation }) => {
       )}
 
       <FlatList
+        ref={flatListRef}
         className="p-4"
         data={paginatedOrders}
         keyExtractor={(item) => item.id}
         renderItem={renderOrderItem}
+        getItemLayout={getItemLayout}
+        onScrollToIndexFailed={handleScrollToIndexFailed}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={getOrders} />
         }

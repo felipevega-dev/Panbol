@@ -1,7 +1,8 @@
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { NativeStackScreenProps, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { Order } from '../types';
+import { Order, OrderWithDetails } from '../types';
+import { RouteProp } from '@react-navigation/native';
 
 // Tipos para la navegación de autenticación
 export type AuthStackParamList = {
@@ -19,9 +20,17 @@ export type MainTabParamList = {
 
 // Tipos para la navegación de pedidos
 export type OrdersStackParamList = {
-  OrdersList: undefined;
-  OrderDetail: { orderId: string };
-  EditOrder: { order: Order };
+  OrdersList: {
+    editedOrderId?: string;
+    showSuccessMessage?: boolean;
+  } | undefined;
+  OrderDetail: {
+    orderId: string;
+  };
+  CreateOrder: undefined;
+  EditOrder: {
+    order: OrderWithDetails;
+  };
 };
 
 // Tipos para la navegación administrativa
@@ -54,11 +63,10 @@ export type MainTabScreenProps<T extends keyof MainTabParamList> =
   >;
 
 // Tipo para las propiedades de pantalla de Orders
-export type OrdersScreenProps<T extends keyof OrdersStackParamList> = 
-  CompositeScreenProps<
-    NativeStackScreenProps<OrdersStackParamList, T>,
-    MainTabScreenProps<'Orders'>
-  >;
+export type OrdersScreenProps<T extends keyof OrdersStackParamList> = {
+  navigation: NativeStackNavigationProp<OrdersStackParamList, T>;
+  route: RouteProp<OrdersStackParamList, T>;
+};
 
 // Tipo para las propiedades de pantalla de Admin
 export type AdminScreenProps<T extends keyof AdminStackParamList> = 

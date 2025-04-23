@@ -661,10 +661,6 @@ const ProductsAdminScreen: React.FC = () => {
     >
       <View className={Platform.OS === 'web' ? "p-4" : "p-3"}>
         <View className="flex-row justify-between items-center mb-4">
-          <Text className={`${Platform.OS === 'web' ? 'text-2xl' : 'text-xl'} font-bold text-gray-800`}>
-            Administrar Productos
-          </Text>
-          
           {!showForm && (
             <TouchableOpacity 
               onPress={() => {

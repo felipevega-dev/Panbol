@@ -167,7 +167,13 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
       if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
         navigation.reset({
           index: 0,
-          routes: [{ name: 'OrdersList' }],
+          routes: [{ 
+            name: 'OrdersList',
+            params: { 
+              editedOrderId: order.id,
+              showSuccessMessage: true 
+            }
+          }],
         });
         return;
       }
@@ -178,7 +184,10 @@ const EditOrderScreen: React.FC<Props> = ({ route, navigation }) => {
         'Tu pedido ha sido actualizado correctamente.',
         [{ 
           text: 'OK', 
-          onPress: () => navigation.navigate('OrdersList')
+          onPress: () => navigation.navigate('OrdersList', { 
+            editedOrderId: order.id,
+            showSuccessMessage: true 
+          })
         }]
       );
     } catch (error) {
